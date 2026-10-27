@@ -1,0 +1,32 @@
+# Git에 올리지 않을 것. 사실에 근거한 목록: 개발 도구가 만든 폴더, 세션 체크포인트, 비밀 값, 임시 파일.
+
+# 다른 개발 도구가 만든 폴더 (키트와 무관. 세션 기록·보안 훅 기록이 들어 있을 수 있음)
+.remember/
+.sodam-re/
+.claude/
+.superpowers/
+
+# 세션 체크포인트 (commit/push 금지)
+CHECKPOINT.md
+
+# 비밀 값·인증서·키 (실수로 넣는 일을 막는 안전망. 이 프로젝트는 비밀 값을 쓰지 않는다)
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+secrets.*
+
+# 기록·임시·백업 파일
+*.log
+*.tmp
+*.bak
+
+# 운영체제·편집기
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,6 @@
+# 줄 끝 규칙: 받은 PC의 git 설정(core.autocrlf)과 상관없이 시험이 같은 결과가 나오게 고정한다.
+#  - .bat/.cmd 는 CRLF 여야 한다(tests\Bootstrap.Tests.ps1 이 검사).
+#  - 나머지 글자 파일은 LF 로 둔다. README.html 은 도구가 LF 로 만들고 시험이 글자 그대로 비교한다.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
