@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>The only command you can really use right now is <strong><code>kakao version</code></strong>. Sending messages, reading chats, searching, saving and the numbered menu are <strong>not built yet.</strong> This document keeps "works now (✅)" and "planned (⏳)" apart from the first line to the last.</p>
 <p>This is an <strong>unofficial tool</strong>. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read <a href="#legal">Chapter 17, Legal, copyright and license</a> before using it.</p>
 </blockquote>
-<p>Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.</p>
+<p>Document date: 2026-10-29 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) + gatekeeper Hangul-key exception · License: Apache License 2.0 · Written so that people who are new to computers can follow it.</p>
 <ul>
 <li>✅ = works right now. ⏳ = does not work yet (planned).
 </li>
@@ -182,7 +182,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>How to tell rooms apart when several rooms have the same name
 </li>
-<li>False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together
+<li>False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
 </li>
 <li>How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
 </li>
@@ -625,7 +625,19 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody></table></div>
 <a id="changelog"></a>
 <h2>14. Update summary (click to expand)</h2>
-<p>Click a title to expand it. Work was done from 2026-10-27 to 2026-10-28. The test counts are the number of automated tests that passed at that point.</p>
+<p>Click a title to expand it. Work was done from 2026-10-27 to 2026-10-29. The test counts are the number of automated tests that passed at that point.</p>
+<details>
+<summary><strong>Gatekeeper: Hangul-key exception</strong> — tests 180 → 184</summary>
+<ul>
+<li>When the real-KakaoTalk spike (step 7) started, the gatekeeper stopped before the first click, because the pressed-key check read the Hangul/English key as held down all the time. I confirmed it by only reading key state without sending any key: it was held in 20 of 20 reads, even 30 seconds after the last input. The kit could not send a single input.
+</li>
+<li>The pressed-key check now leaves out that one key. It is a mode-switch key, so a paste or click sent while it is held cannot turn into a wrong shortcut. Every other key (Ctrl, Shift, Alt, Esc, Delete, the Windows key, letters and so on) is still blocked. This judgment rests on the nature of the key; it has not yet been confirmed in real KakaoTalk.
+</li>
+<li>Four tests were added (only the Hangul key held passes; Hangul plus Ctrl held is refused because of Ctrl; every other key in the scanned range is refused one by one; the exception list has exactly one entry).
+</li>
+<li>After the fix I read the key state again on this PC and saw it change to no key held (0).
+</li></ul>
+</details>
 <details>
 <summary><strong>Minimal version check (M7-0)</strong> — tests 157 → 180</summary>
 <ul>
@@ -951,12 +963,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Bootstrap.Tests.ps1</code></td><td>20</td><td>Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, <code>시작.bat</code> working with special characters in the folder name, <code>.gitignore</code> entries, behaviour of <code>version</code> and of an unknown command</td></tr>
 <tr><td><code>Config.Tests.ps1</code></td><td>30</td><td>Allowed list, permissions, only a person may change, consent, strange hand-edited settings</td></tr>
 <tr><td><code>Log.Tests.ps1</code></td><td>11</td><td>Records without message text, tidying the record file, error report</td></tr>
-<tr><td><code>Guard.Tests.ps1</code></td><td>39</td><td>The gatekeeper: window check, allowed keys, human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent)</td></tr>
+<tr><td><code>Guard.Tests.ps1</code></td><td>43</td><td>The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent)</td></tr>
 <tr><td><code>Clip.Tests.ps1</code></td><td>9</td><td>Saving, replacing and restoring the clipboard, stopping on an image or file</td></tr>
 <tr><td><code>Parse.Tests.ps1</code></td><td>20</td><td>Reading export files, strange dates and times, line-end differences</td></tr>
 <tr><td><code>Status.Tests.ps1</code></td><td>23</td><td>Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests</td></tr>
 <tr><td><code>Readme.Tests.ps1</code></td><td>28</td><td>The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner</td></tr>
-<tr><td><strong>Total</strong></td><td><strong>180</strong></td><td></td></tr>
+<tr><td><strong>Total</strong></td><td><strong>184</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>Building the guide html</h3>
 <p>The sources of the guide are <code>README.md</code> and <code>README.en.md</code>. The html is made with the tool below and must not be edited by hand.</p>

@@ -9,7 +9,7 @@
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
-Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
+Document date: 2026-10-29 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) + gatekeeper Hangul-key exception · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
 
 - ✅ = works right now. ⏳ = does not work yet (planned).
 - In this document `kakao` is shorthand. You actually type `.\kakao.cmd`. The reason is in [Chapter 6](#run).
@@ -119,7 +119,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 - Searching, opening and exporting in ordinary rooms (1:1 and group chats)
 - Behaviour when KakaoTalk is closed or shows the login screen
 - How to tell rooms apart when several rooms have the same name
-- False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together
+- False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
 - How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
 - Static analysis tool (PSScriptAnalyzer): it is not installed, so it could not be run.
 - Reaction of antivirus software and SmartScreen
@@ -571,7 +571,17 @@ The settings and records the kit creates are stored separately in your **user fo
 <a id="changelog"></a>
 ## 14. Update summary (click to expand)
 
-Click a title to expand it. Work was done from 2026-10-27 to 2026-10-28. The test counts are the number of automated tests that passed at that point.
+Click a title to expand it. Work was done from 2026-10-27 to 2026-10-29. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Gatekeeper: Hangul-key exception</strong> — tests 180 → 184</summary>
+
+- When the real-KakaoTalk spike (step 7) started, the gatekeeper stopped before the first click, because the pressed-key check read the Hangul/English key as held down all the time. I confirmed it by only reading key state without sending any key: it was held in 20 of 20 reads, even 30 seconds after the last input. The kit could not send a single input.
+- The pressed-key check now leaves out that one key. It is a mode-switch key, so a paste or click sent while it is held cannot turn into a wrong shortcut. Every other key (Ctrl, Shift, Alt, Esc, Delete, the Windows key, letters and so on) is still blocked. This judgment rests on the nature of the key; it has not yet been confirmed in real KakaoTalk.
+- Four tests were added (only the Hangul key held passes; Hangul plus Ctrl held is refused because of Ctrl; every other key in the scanned range is refused one by one; the exception list has exactly one entry).
+- After the fix I read the key state again on this PC and saw it change to no key held (0).
+
+</details>
 
 <details>
 <summary><strong>Minimal version check (M7-0)</strong> — tests 157 → 180</summary>
@@ -914,12 +924,12 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Bootstrap.Tests.ps1` | 20 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
-| `Guard.Tests.ps1` | 39 | The gatekeeper: window check, allowed keys, human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
+| `Guard.Tests.ps1` | 43 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **180** | |
+| **Total** | **184** | |
 
 ### Building the guide html
 
