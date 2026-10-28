@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>지금 실제로 쓸 수 있는 명령은 <strong><code>kakao version</code> 하나뿐</strong>입니다. 메시지 보내기·대화 읽기·검색·저장·번호 메뉴는 <strong>아직 만들어지지 않았습니다.</strong> 이 문서는 "지금 되는 것(✅)"과 "만들 예정인 것(⏳)"을 처음부터 끝까지 구분해서 적습니다.</p>
 <p><strong>비공식 도구</strong>입니다. 카카오톡을 만든 회사(주식회사 카카오)와 아무 관계가 없습니다. 사용에 따른 책임은 사용자에게 있습니다. 사용하기 전에 반드시 <a href="#legal">17장 법률·저작권·라이선스</a>를 읽어 주세요.</p>
 </blockquote>
-<p>문서 기준일: 2026-10-28 · 기준: 작업 1~6 완료 + 검증 2회 + 저장소 정리(M0) 반영 · 라이선스: Apache License 2.0 · 이 문서는 컴퓨터를 처음 다루는 분도 따라 할 수 있도록 썼습니다.</p>
+<p>문서 기준일: 2026-10-28 · 기준: 작업 1~6 완료 + 검증 2회 + 저장소 정리(M0) + 버전 확인 최소판(M7-0) 반영 · 라이선스: Apache License 2.0 · 이 문서는 컴퓨터를 처음 다루는 분도 따라 할 수 있도록 썼습니다.</p>
 <ul>
 <li>✅ = 지금 실제로 됩니다. ⏳ = 아직 안 됩니다(만들 예정).
 </li>
@@ -288,7 +288,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <thead><tr><th>이름</th><th>누가 정하나</th><th>뜻</th><th>기본값</th></tr></thead>
 <tbody>
 <tr><td><code>KAKAO_KIT_HOME</code></td><td>사용자(선택)</td><td>키트의 데이터 폴더(설정·기록·내보내기)를 이 폴더로 바꿉니다. 원래 자동 시험용입니다.</td><td>없음 → <code>%LOCALAPPDATA%\KakaoKit</code></td></tr>
-<tr><td><code>KAKAO_E2E</code></td><td>개발자(선택)</td><td><code>1</code> 로 두면 실제 카카오톡을 조작하는 시험을 실행하도록 정해 둔 이름입니다. 아직 이 변수를 읽는 시험은 없고 7단계부터 사용할 예정입니다(⏳).</td><td>없음 → 실행하지 않음</td></tr>
+<tr><td><code>KAKAO_E2E</code></td><td>개발자(선택)</td><td><code>1</code> 로 두면 실제 카카오톡을 조작하는 시험을 실행하도록 정해 둔 이름입니다. 시험 도우미 <code>Test-E2EEnabled</code>(<code>tests\_Load.ps1</code>)가 이 변수를 읽고, 글자가 정확히 <code>1</code> 일 때만 켜집니다. 아직 이 도우미를 쓰는 시험은 없고 7단계부터 사용할 예정입니다(⏳).</td><td>없음 → 실행하지 않음</td></tr>
 <tr><td><code>NoDefaultCurrentDirectoryInExePath</code></td><td>윈도우 보안 설정</td><td><code>1</code> 이면 현재 폴더의 프로그램을 이름만으로 찾지 않습니다. 키트가 바꾸지 않으며 바꿀 필요도 없습니다.</td><td>PC마다 다름 (이 PC는 1)</td></tr>
 <tr><td><code>LOCALAPPDATA</code></td><td>윈도우</td><td>사용자 데이터 폴더의 기준 위치입니다.</td><td>윈도우가 정함</td></tr>
 </tbody></table></div>
@@ -513,7 +513,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td><code>Ocr.ps1</code>, <code>Room.ps1</code></td><td>검색 결과 확인과 방 열기</td><td>⏳ 7단계</td></tr>
 <tr><td><code>Send.ps1</code></td><td>메시지 보내기</td><td>⏳ 8단계</td></tr>
 <tr><td><code>Export.ps1</code>, <code>Search.ps1</code></td><td>내보내기, 읽기, 검색</td><td>⏳ 9단계</td></tr>
-<tr><td><code>Status.ps1</code></td><td>상태 점검, 카카오톡 버전·로그인 확인</td><td>⏳ 10단계</td></tr>
+<tr><td><code>Status.ps1</code></td><td>설치된 카카오톡 버전을 읽고(레지스트리와 실행 중인 프로세스를 대조) 시험해 본 버전인지 판정합니다. 읽기만 합니다. 로그인 확인과 전체 점검은 10단계에서 덧붙입니다.</td><td>✅ 부품 (최소판)</td></tr>
 <tr><td><code>Menu.ps1</code></td><td>번호 메뉴</td><td>⏳ 11단계</td></tr>
 <tr><td><code>Install.ps1</code></td><td>첫 실행, 업데이트, 제거</td><td>⏳ 12단계</td></tr>
 </tbody></table></div>
@@ -626,6 +626,20 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <a id="changelog"></a>
 <h2>14. 업데이트 내용 요약 (펼쳐 보기)</h2>
 <p>제목을 누르면 내용이 펼쳐집니다. 작업은 2026-10-27부터 2026-10-28까지 이루어졌습니다. 시험 개수는 그 시점에 통과한 자동 시험의 수입니다.</p>
+<details>
+<summary><strong>버전 확인 최소판 (M7-0)</strong> — 시험 157개 → 180개</summary>
+<ul>
+<li>카카오톡이 자동 업데이트로 <code>26.9.0.5337</code> 에서 <code>26.9.1.5339</code> 로 바뀐 것을 계기로, 설치된 카카오톡 버전을 읽고 시험해 본 버전인지 판정하는 <code>Status.ps1</code>(최소판)을 만들었습니다. 카카오톡을 열거나 조작하지 않고, 레지스트리 값과 실행 중인 프로세스의 파일 버전을 읽기만 합니다.
+</li>
+<li>두 값이 서로 다르거나, 프로세스끼리 다르거나, 읽지 못하면 버전을 비워서 돌려주고 시험해 본 버전이 아닌 것으로 취급합니다(모르면 안전한 쪽).
+</li>
+<li>시험해 본 버전 목록(<code>config\verified-versions.json</code>)은 바꾸지 않았습니다. 이 PC의 <code>26.9.1.5339</code> 는 목록에 없으므로 판정은 시험해 본 버전이 아님입니다. 목록에 넣는 것은 실제 카카오톡 보내기 시험을 통과한 뒤에만 합니다.
+</li>
+<li>실제 카카오톡을 조작하는 시험을 켜는 스위치를 읽는 시험 도우미 <code>Test-E2EEnabled</code> 를 추가했습니다. 글자가 정확히 <code>1</code> 일 때만 켜집니다. 아직 이 도우미를 쓰는 시험은 없습니다.
+</li>
+<li>시험 23개를 추가했습니다(가짜 레지스트리·프로세스로 12개, 버전 판정 8개, 읽기만 함 2개, 스위치 1개).
+</li></ul>
+</details>
 <details>
 <summary><strong>저장소 정리 (M0)</strong> — 시험 149개 → 157개</summary>
 <ul>
@@ -940,8 +954,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Guard.Tests.ps1</code></td><td>39</td><td>문지기: 창 확인, 허용 키, 사람 손 감지, 동시 실행 잠금, 클릭 안전, 소스에 Esc 등 위험한 키 코드가 없음, 실제 윈도우 기능 읽기(입력은 보내지 않음)</td></tr>
 <tr><td><code>Clip.Tests.ps1</code></td><td>9</td><td>클립보드 저장·교체·복원, 이미지·파일이면 중단</td></tr>
 <tr><td><code>Parse.Tests.ps1</code></td><td>20</td><td>내보내기 파일 읽기, 이상한 날짜·시각, 줄 끝 차이</td></tr>
+<tr><td><code>Status.Tests.ps1</code></td><td>23</td><td>카카오톡 설치 버전 읽기(레지스트리와 프로세스 대조, 못 읽으면 버전 없음), 시험해 본 버전인지 글자 그대로 판정, 읽기만 하는지, 실제 조작 시험 스위치</td></tr>
 <tr><td><code>Readme.Tests.ps1</code></td><td>28</td><td>설명서 변환기, 설명서가 실제(시험 개수·명령 상태·버전·화면 문구·링크)와 같은지, LICENSE 전문과 권리자</td></tr>
-<tr><td><strong>합계</strong></td><td><strong>157</strong></td><td></td></tr>
+<tr><td><strong>합계</strong></td><td><strong>180</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>설명서 html 만들기</h3>
 <p>설명서의 원본은 <code>README.md</code> 와 <code>README.en.md</code> 입니다. html은 아래 도구로 만들며, 손으로 고치지 않습니다.</p>

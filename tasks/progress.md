@@ -52,3 +52,14 @@ M0: Ruling: 시작.bat 은 `call "%~dp0kakao.cmd"` 대신 `pushd "%~dp0"` 로 �
 M0: Ruling: 폴더 이름이 존재하는 환경 변수를 %...% 로 감싼 꼴(예: A%TEMP%B)은 고치지 않고 알려진 한계로 문서화했다 — cmd /c 가 배치 파일을 열기도 전에 이름을 바꿔 "파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다"로 끝나며 배치 파일 안에서는 손댈 수 없음(직접 확인). 비용: 그런 이름의 폴더에서는 계속 실패한다. 탐색기 더블클릭에서의 동작은 확인하지 못했다.
 M0: Ruling: D-03 은 제품 코드가 아니라 시험 도우미(Invoke-LockChild)가 자식 프로세스용 임시 .ps1 을 BOM 없이 써서 생긴 것이라 시험 파일만 고쳤다. 비용 없음.
 M0: 도구 함정(다음 작업자 참고): (1) 파일 쓰기 도구가 내용 속 `\uXXXX` 이스케이프를 실제 문자로 바꿔 저장하므로, BOM 없는 .ps1 에 한글이 들어가면 5.1 이 cp1252 로 읽어 이름이 깨진다 → 임시 스크립트도 Write-Bom.ps1 -Path 를 거칠 것. (2) `powershell -File x.ps1 -Path a,b` 처럼 쉼표로 여러 파일을 넘기면 하나의 문자열이 되어 실패한다 → 파일마다 따로 부를 것. (3) Write-Bom.ps1 -Path 는 .bat 을 CRLF 로 되돌려 준다(쓴 직후 반드시).
+
+M7-0 (2026-10-28, branch feat/m7-0-version-check): 버전 확인 최소판 + E2E 스위치. 카카오톡은 한 번도 조작하지 않음(레지스트리·프로세스 읽기만). 시험 157 → 180(Status 23).
+M7-0: Verify-RED/GREEN: 시험 23개를 먼저 써서 전부 실패(0/23, 원인은 Status.ps1 과 Test-E2EEnabled 가 없음)를 눈으로 확인 → 구현 → 23/23 → 전체 180/180(건너뜀 0). 문법 검사 오류 0, 민감정보 적중 0, Build-Readme -Check 최신.
+M7-0: 실측(이 PC, 읽기 전용): Get-KakaoInstallInfo = Version 26.9.1.5339 / Source registry+process / Running True. Test-KakaoVersionVerified(실제 설치 버전) = False, ('26.9.0.5337') = True. config\verified-versions.json 무변경(26.9.0.5337 하나).
+M7-0: Ruling: Version 은 믿을 수 있을 때만 글자이고, 레지스트리와 프로세스가 다르거나 프로세스끼리 다르거나 프로세스 버전을 못 읽거나 읽기 오류면 $null(= 검증 안 됨). 비용: Log.ps1 의 New-KitErrorReport 는 .Version 만 읽으므로 이런 때 보고서에 버전 대신 알 수 없음이 적혀 진단 정보가 줄어든다. 틀린 버전을 적는 것보다 안전해서 택함.
+M7-0: Ruling: 버전은 레지스트리 세 곳(HKLM WOW6432Node → HKLM 64비트 → HKCU)에서 비어 있지 않은 첫 DisplayVersion 을 쓴다. 확인된 위치는 첫 번째뿐(CHECKPOINT 10장). 비용: 뒤의 두 곳에 낡은 값이 있어도 첫 번째가 우선이고, 첫 번째가 없을 때만 뒤를 본다(이 PC 에는 없음).
+M7-0: Ruling: 레지스트리에 값이 없고 프로세스만 있으면 프로세스 파일 버전을 쓴다(Source=process). 파일 버전은 실행 파일이 실제로 가진 값이라 직접 증거다.
+M7-0: Ruling: Test-KakaoVersionVerified 에 -VerifiedList 매개변수를 추가했다(계획서에 없음). 시험이 verified-versions.json 파일에 의존하지 않고 목록을 직접 정하려고. 기본은 Get-VerifiedKakaoVersions 이고, 목록을 못 읽으면 예외가 아니라 $false. 비용 없음.
+M7-0: Ruling: Test-E2EEnabled 는 환경 변수가 정확히 글자 1 일 때만 참(tests\_Load.ps1). Pester 의 -Skip 은 건너뜀으로 세어져 기준선 건너뜀 0 이 깨지므로, 앞으로 E2E 시험은 Describe 전체를 if (Test-E2EEnabled) 안에 둔다. 아직 이 도우미를 쓰는 시험은 없음.
+M7-0: Ruling: 5339 에서의 M7 스파이크는 verified-versions.json 에 5339 를 넣지 않고, 스파이크 도구가 사람이 그 회차에 명시한 버전과 글자 그대로 비교해 다르면 중단하는 절차로 한다(CHECKPOINT 0.5). 코드가 아니라 절차라서 M7-0 범위를 늘리지 않았다. 5339 를 목록에 넣는 것은 M8 보내기 시험 통과 뒤에만 하며, 그 시험은 --allow-unverified 로 돌려야 한다(설계서 13.3).
+M7-0: 한계(미검증): 관리자 권한으로 실행 중인 카카오톡 프로세스의 MainModule 은 읽지 못할 수 있고 그 경우 error 로 처리된다(안전 쪽). 다른 PC·한글 윈도우·카카오톡이 여러 프로세스인 경우의 실제 동작은 확인하지 못했다.
