@@ -1,7 +1,7 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-10-27-kakao-kit-plan.md
 
 실행 방식: Native(직접 구현, 이 세션). 사용자 지시: "D:\AI_Dev_Work\2026y\26y_10m_27d_Kakao-CLI_One-Click_Kit 이 경로에 직접 구현" (2026-10-27).
-저장소 아님 → git/worktree/commit 없음. 이 파일이 진행 기록(ledger)이다. 완료 줄은 `Task N: complete (...)` 형식.
+작업 1~6 당시에는 저장소가 아니어서 git/worktree/commit 이 없었다(정정 2026-10-28: 이후 git 저장소가 되어 작업 branch + PR 로 운영한다). 이 파일이 진행 기록(ledger)이다. 완료 줄은 `Task N: complete (...)` 형식.
 시험 실행: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1` (Pester 3.4.0 문법: `Should Be`, `Should Throw`).
 
 ## Pre-flight (작업 간 공유 인터페이스 점검)
@@ -44,4 +44,11 @@ Verify-2 Task 7/8/11을 위한 메모(검토자 열린 질문): (1) Task 7+ 호�
 README: complete (2026-10-27, 시험 148/148 = 기존 121 + Readme 27, 건너뜀 0): 최상위 `README.md`/`README.en.md`(원본) + `README.html`/`README.en.html`(tools\Build-Readme.ps1이 생성, 손으로 고치지 않음). 변환기 시험 12개를 먼저 쓰고(RED: 파일 없음) 변환기를 만들어 GREEN, 문서 합격 기준 14개(RED: 문서 없음)를 문서로 GREEN. 검증 중 문서의 **틀린 곳 2종을 시험이 잡아 고침**: (a) 화면 문구를 일부만 잘라 코드 문구로 인용 → "인용 문구가 문구 사전과 글자 그대로 같다" 시험 추가(RED 확인) 후 전부 전체 문장으로 수정 (b) Bootstrap/Guard 시험 설명이 실제 시험 이름과 어긋남 → 수정. 시험 오탐 1건 수정(소문자 todo.md 파일명이 미완성 표식 검사에 걸려 대문자 표식만 보게 함). 눈으로 확인: headless Edge로 어두운/밝은 화면·좁은 화면(420px) 렌더링 확인(표는 가로 스크롤). 미확인: 실제 휴대폰, 다른 브라우저, 영문의 번역 품질(구조 동일만 시험으로 보증, 사람 감수 없음).
 README 유지 규칙: 시험 파일을 늘리거나 줄이면 README 두 문서의 "시험 개수" 표(파일별 개수와 합계)를 고쳐야 통과함(Readme.Tests가 강제). md를 고친 뒤에는 `tools\Build-Readme.ps1`로 html을 다시 만들 것(안 만들면 "최신이 아님" 시험 실패). 명령 표의 ✅ 행은 src\kakao.ps1 라우터가 실제로 처리하는 명령과 같아야 함 → Task 7~11에서 명령이 생길 때마다 README 표(KO/EN 둘 다)와 2장 단계 표를 갱신.
 Task 11 메모(README 작성 중 발견): (1) 오류 문구 `... 도움말: kakao help`는 이 PC처럼 NoDefaultCurrentDirectoryInExePath=1 이면 그대로 입력해도 실패 → 문구를 `.\kakao.cmd help` 형태로 고치고 `help` 명령도 구현할 것. (2) README 15장·12.3·7장이 이 한계를 "알려진 한계"로 적고 있으니 고치면 README도 같이 갱신.
-README Ruling (2026-10-27): 사용자가 지금까지 구현된 기준의 README(한글 기본+영문, md+html, 프로젝트 최상위)를 요청 → 계획서의 `docs/README.ko.md`(Task 13)를 앞당겨 **최상위** `README.md`/`README.en.md`/`README.html`/`README.en.html`로 만든다. md가 원본이고 html은 `tools\Build-Readme.ps1`이 만들어 내용이 같음을 구조적으로 보장. "되는 것/만들 예정"을 표로 분리(Task 7~13 미구현). Task 13에서 갱신. 라이선스는 소유자가 정하지 않았으므로 "별도 라이선스 없음 = 모든 권리 보유"로 사실만 적음(바꾸려면 소유자 결정 필요).
+README Ruling (2026-10-27): 사용자가 지금까지 구현된 기준의 README(한글 기본+영문, md+html, 프로젝트 최상위)를 요청 → 계획서의 `docs/README.ko.md`(Task 13)를 앞당겨 **최상위** `README.md`/`README.en.md`/`README.html`/`README.en.html`로 만든다. md가 원본이고 html은 `tools\Build-Readme.ps1`이 만들어 내용이 같음을 구조적으로 보장. "되는 것/만들 예정"을 표로 분리(Task 7~13 미구현). Task 13에서 갱신. 라이선스는 소유자가 정하지 않았으므로 "별도 라이선스 없음 = 모든 권리 보유"로 사실만 적음(바꾸려면 소유자 결정 필요). (정정 2026-10-28: 이후 소유자가 Apache License 2.0 으로 정해 LICENSE 를 추가했다. 위 "별도 라이선스 없음"은 그 이전 기록이다.)
+
+M0 (2026-10-28, branch feat/m0-cleanup): 저장소 정리. 대상 D-01(.gitignore), D-02(시작.bat), D-03(Guard 시험의 한글 경로), D-05(낡은 문서). 시험 149 → 157(Bootstrap 12 → 20).
+M0: Verify-RED/GREEN: 고치기 전에 (a) 폴더 이름 별 시작.bat 재현 — plain·&·!·한글 은 정상, ^ 와 %20 은 exit 0 인데 버전 줄 없음(조용한 실패), %TEMP% 꼴은 exit 1 (b) 한글 경로 clone 에서 Guard 38 통과 / 1 실패("another process cannot take the lock…" Expected 2 But was 1) (c) 추가한 시험 5개가 정확히 그 결함에서 실패(대조군 plain·&·!·한글 폴더는 통과). 고친 뒤 Bootstrap 20/20, 한글 경로 clone 의 Guard 39/39, 현재 폴더 Guard 39/39.
+M0: Ruling: 시작.bat 은 `call "%~dp0kakao.cmd"` 대신 `pushd "%~dp0"` 로 폴더에 들어간 뒤 `call .\kakao.cmd version` 을 부른다(call 이 줄을 한 번 더 해석해서 폴더 이름의 ^ 와 % 가 바뀌는 것이 원인). 실패 판정은 `if errorlevel 1` 이 아니라 `if not "%errorlevel%"=="0"` — powershell -File 이 파일을 못 찾으면 -196608 같은 음수를 돌려주는데 `if errorlevel 1` 은 음수를 놓친다(직접 확인). 실패하면 한글 안내를 항상 출력한다. 비용: 실행 중 현재 폴더가 잠시 바뀐다(popd 로 복원).
+M0: Ruling: 폴더 이름이 존재하는 환경 변수를 %...% 로 감싼 꼴(예: A%TEMP%B)은 고치지 않고 알려진 한계로 문서화했다 — cmd /c 가 배치 파일을 열기도 전에 이름을 바꿔 "파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다"로 끝나며 배치 파일 안에서는 손댈 수 없음(직접 확인). 비용: 그런 이름의 폴더에서는 계속 실패한다. 탐색기 더블클릭에서의 동작은 확인하지 못했다.
+M0: Ruling: D-03 은 제품 코드가 아니라 시험 도우미(Invoke-LockChild)가 자식 프로세스용 임시 .ps1 을 BOM 없이 써서 생긴 것이라 시험 파일만 고쳤다. 비용 없음.
+M0: 도구 함정(다음 작업자 참고): (1) 파일 쓰기 도구가 내용 속 `\uXXXX` 이스케이프를 실제 문자로 바꿔 저장하므로, BOM 없는 .ps1 에 한글이 들어가면 5.1 이 cp1252 로 읽어 이름이 깨진다 → 임시 스크립트도 Write-Bom.ps1 -Path 를 거칠 것. (2) `powershell -File x.ps1 -Path a,b` 처럼 쉼표로 여러 파일을 넘기면 하나의 문자열이 되어 실패한다 → 파일마다 따로 부를 것. (3) Write-Bom.ps1 -Path 는 .bat 을 CRLF 로 되돌려 준다(쓴 직후 반드시).

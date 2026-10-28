@@ -9,7 +9,7 @@
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
-Document date: 2026-10-27 · Basis: steps 1-6 done + two verification rounds · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
+Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
 
 - ✅ = works right now. ⏳ = does not work yet (planned).
 - In this document `kakao` is shorthand. You actually type `.\kakao.cmd`. The reason is in [Chapter 6](#run).
@@ -164,7 +164,7 @@ If you received the folder directly by USB or as a compressed file, install it w
 ### How to install (copy the folder)
 
 1. If it is a compressed file (.zip), **extract it completely first.** Right-click the file and choose "Extract All". If you run it from inside the compressed file, only some files are unpacked temporarily and it fails.
-2. Put the extracted folder wherever you like. Example: `D:\KakaoKit`. Do not put `%` in the folder name (a known limitation in Chapter 15).
+2. Put the extracted folder wherever you like. Example: `D:\KakaoKit`. A short name with only English letters and digits is recommended. Do not name a folder in the `%NAME%` form such as `%PATH%` (a known limitation in Chapter 15).
 3. When you can see `시작.bat`, `kakao.cmd` and the `src` folder inside the folder, you are ready.
 4. There is no installer, no sign-up and no login.
 
@@ -571,7 +571,18 @@ The settings and records the kit creates are stored separately in your **user fo
 <a id="changelog"></a>
 ## 14. Update summary (click to expand)
 
-Click a title to expand it. All work was done on 2026-10-27. The test counts are the number of automated tests that passed at that point.
+Click a title to expand it. Work was done from 2026-10-27 to 2026-10-28. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Repository cleanup (M0)</strong> — tests 149 → 157</summary>
+
+- Fixed `시작.bat` ending with neither a version line nor an error message when the folder name contains `^` or `%` (for example `A^B`, `A%20B`). It now enters that folder, calls `kakao.cmd` by a relative path without special characters, and shows a Korean message when it fails. A negative exit code (for example -196608) is also treated as a failure.
+- Known limitation: a folder name that wraps the name of an existing environment variable in `%`, such as `%PATH%`, is rewritten by Windows before `시작.bat` is opened, so it cannot be fixed. Behaviour when double-clicking in File Explorer was not confirmed.
+- One `Guard` test that failed in a folder path containing Korean text was a problem on the test side (the test helper wrote its temporary file without a BOM); the product code was fine. Fixed.
+- Added `.omc/`, `.codex/` and screen captures (`captures/`, `*.png`, `*.jpg`) to `.gitignore`, because a capture can show the names of other chat rooms.
+- Added 8 tests (6 for `시작.bat` by folder name, 1 for the Korean message on failure, 1 for `.gitignore`).
+
+</details>
 
 <details>
 <summary><strong>GitHub private repository and license added</strong> — tests 148 → 149</summary>
@@ -679,7 +690,7 @@ Click a title to expand it. All work was done on 2026-10-27. The test counts are
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| When you open `시작.bat` the black window flashes and disappears | You ran it from inside the compressed file, or the folder name contains `%`. | Extract everything, move it to a place whose folder name has no `%`, and run it again. |
+| When you open `시작.bat` the black window flashes and disappears | You ran it from inside the compressed file, or the folder name is in the `%NAME%` form such as `%PATH%`. | Extract everything, move it to a place with a short English-and-digits folder name, and run it again. When it cannot run, the window shows a message saying it could not run. |
 | `'kakao.cmd' is not recognized as an internal or external command` (on Korean Windows, a Korean message with the same meaning) | A Windows setting stops it from finding programs in the current folder by name alone. | Put `.\` in front, as in `.\kakao.cmd version`, or run it with the full path. |
 | `kakao version` does not work in PowerShell | PowerShell does not run programs in the current folder without `.\`. | Type `.\kakao.cmd version`. |
 | Korean text shows as `???` or strange characters | A problem with the window's character table, or a `.ps1` file was saved without BOM. | Run it with `시작.bat`. If you need to edit a file, save `.ps1` as "UTF-8 with BOM" or repair it with `tools\Write-Bom.ps1 -All`. |
@@ -775,7 +786,7 @@ See the first row in [Chapter 15](#troubleshooting).
 
 **Q15. May I move the folder somewhere else?**
 
-Yes. Move the whole folder. But if the folder name contains `%`, `시작.bat` fails.
+Yes. Move the whole folder. `시작.bat` works even if the folder name contains `^` or `%` (fixed on 2026-10-28). However, a folder name that wraps the name of an existing environment variable in `%`, such as `%PATH%`, is rewritten by Windows first and does not run.
 
 **Q16. May I edit the settings file by hand?**
 
@@ -889,14 +900,14 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 
 | Test file | Count | What it checks |
 |---|---|---|
-| `Bootstrap.Tests.ps1` | 12 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, behaviour of `version` and of an unknown command |
+| `Bootstrap.Tests.ps1` | 20 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
 | `Guard.Tests.ps1` | 39 | The gatekeeper: window check, allowed keys, human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **149** | |
+| **Total** | **157** | |
 
 ### Building the guide html
 

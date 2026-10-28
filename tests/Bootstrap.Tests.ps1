@@ -141,6 +141,66 @@ Describe 'Bootstrap: 안전 규칙 (throw 하는 함수는 항상 중단한다)'
     }
 }
 
+# 시작.bat 을 폴더 이름이 다른 복사본에서 실제로 실행해 본다. 입력은 닫아 둔다(마지막의 "아무 키나" 대기가 바로 끝나게).
+function Invoke-StartBatInFolder([string]$FolderName, [switch]$WithoutSrc) {
+    $base = Join-Path ([System.IO.Path]::GetTempPath()) ('kakaokit-startbat-' + [guid]::NewGuid().ToString('N'))
+    $dir = Join-Path $base $FolderName
+    try {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $root '시작.bat') -Destination $dir
+        Copy-Item -LiteralPath (Join-Path $root 'kakao.cmd') -Destination $dir
+        if (-not $WithoutSrc) { Copy-Item -LiteralPath (Join-Path $root 'src') -Destination $dir -Recurse }
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $env:ComSpec
+        $psi.Arguments = '/c ""' + (Join-Path $dir '시작.bat') + '""'
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+        $psi.CreateNoWindow = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.StandardInput.Close()
+        $done = $proc.WaitForExit(30000)
+        if (-not $done) { $proc.Kill() }
+        $out = $proc.StandardOutput.ReadToEnd()
+        return @{ TimedOut = (-not $done); Out = $out }
+    }
+    finally { Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Describe 'Bootstrap: 시작.bat 은 폴더 이름에 특수 글자가 있어도 동작한다' {
+    # plain 은 대조군(시험 도구 자체가 맞는지 보여 준다). ^ 와 % 는 call 이 한 번 더 해석해서 예전에는 버전 줄 없이 조용히 끝났다.
+    # 존재하는 환경 변수 이름을 %...% 로 감싼 폴더(A%TEMP%B)는 시험하지 않는다: cmd /c 가 배치 파일을 열기 전에 이름을 바꿔 버려서 배치 파일 안에서는 고칠 수 없다(README 알려진 한계).
+    # 반복문 대신 It 를 하나씩 쓴다: Readme.Tests 가 소스의 "It '" 줄 수로 시험 개수를 세므로 반복문으로 만든 시험은 개수에서 빠진다.
+    function Assert-StartBatShowsBanner([string]$Folder) {
+        $r = Invoke-StartBatInFolder $Folder
+        $r.TimedOut | Should Be $false
+        $r.Out | Should Match '카카오톡 키트 1\.0\.0'
+    }
+
+    It 'shows the version banner in a plain folder (control: proves the test itself works)' { Assert-StartBatShowsBanner 'plain' }
+    It 'shows the version banner when the folder name contains ^' { Assert-StartBatShowsBanner 'A^B' }
+    It 'shows the version banner when the folder name contains %20' { Assert-StartBatShowsBanner 'A%20B' }
+    It 'shows the version banner when the folder name contains &' { Assert-StartBatShowsBanner 'A&B' }
+    It 'shows the version banner when the folder name contains !' { Assert-StartBatShowsBanner 'A!B' }
+    It 'shows the version banner when the folder name has Korean, spaces and parentheses' { Assert-StartBatShowsBanner '한글 (복사본) 1' }
+
+    It 'says in Korean that it could not run, instead of ending silently' {
+        $r = Invoke-StartBatInFolder 'nosrc' -WithoutSrc
+        $r.TimedOut | Should Be $false
+        $r.Out | Should Match '실행하지 못했습니다'
+    }
+}
+
+Describe 'Bootstrap: 저장소에 올리면 안 되는 것' {
+    It '.gitignore excludes tool state folders and capture images' {
+        $lines = @([System.IO.File]::ReadAllLines((Join-Path $root '.gitignore'), (New-Object System.Text.UTF8Encoding($false))) | ForEach-Object { $_.Trim() })
+        $missing = @('.omc/', '.codex/', 'captures/', '*.png', '*.jpg') | Where-Object { $lines -cnotcontains $_ }
+        ($missing -join ', ') | Should BeNullOrEmpty
+    }
+}
+
 Describe 'Bootstrap: kakao.cmd' {
     It 'version prints the Korean banner and exits 0' {
         $r = Invoke-Cli @('version')
