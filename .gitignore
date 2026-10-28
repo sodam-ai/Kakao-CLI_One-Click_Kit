@@ -5,9 +5,16 @@
 .sodam-re/
 .claude/
 .superpowers/
+.omc/
+.codex/
 
 # 세션 체크포인트 (commit/push 금지)
 CHECKPOINT.md
+
+# 화면 캡처 (카카오톡 메인 창 캡처에는 다른 방의 이름과 미리보기가 찍힌다. 확인 직후 삭제하고 절대 올리지 않는다)
+captures/
+*.png
+*.jpg
 
 # 비밀 값·인증서·키 (실수로 넣는 일을 막는 안전망. 이 프로젝트는 비밀 값을 쓰지 않는다)
 .env

@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>지금 실제로 쓸 수 있는 명령은 <strong><code>kakao version</code> 하나뿐</strong>입니다. 메시지 보내기·대화 읽기·검색·저장·번호 메뉴는 <strong>아직 만들어지지 않았습니다.</strong> 이 문서는 "지금 되는 것(✅)"과 "만들 예정인 것(⏳)"을 처음부터 끝까지 구분해서 적습니다.</p>
 <p><strong>비공식 도구</strong>입니다. 카카오톡을 만든 회사(주식회사 카카오)와 아무 관계가 없습니다. 사용에 따른 책임은 사용자에게 있습니다. 사용하기 전에 반드시 <a href="#legal">17장 법률·저작권·라이선스</a>를 읽어 주세요.</p>
 </blockquote>
-<p>문서 기준일: 2026-10-27 · 기준: 작업 1~6 완료 + 검증 2회 반영 · 라이선스: Apache License 2.0 · 이 문서는 컴퓨터를 처음 다루는 분도 따라 할 수 있도록 썼습니다.</p>
+<p>문서 기준일: 2026-10-28 · 기준: 작업 1~6 완료 + 검증 2회 + 저장소 정리(M0) 반영 · 라이선스: Apache License 2.0 · 이 문서는 컴퓨터를 처음 다루는 분도 따라 할 수 있도록 썼습니다.</p>
 <ul>
 <li>✅ = 지금 실제로 됩니다. ⏳ = 아직 안 됩니다(만들 예정).
 </li>
@@ -233,7 +233,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <ol>
 <li>압축 파일(.zip)이면 <strong>먼저 완전히 풀어 주세요.</strong> 파일을 우클릭해서 "모두 압축 풀기"(영어 윈도우: Extract All)를 고릅니다. 압축 파일 안에서 바로 실행하면 일부 파일만 임시로 풀려 실패합니다.
 </li>
-<li>풀어 둔 폴더를 원하는 곳에 둡니다. 예: <code>D:\KakaoKit</code>. 폴더 이름에 <code>%</code> 를 넣지 마세요(15장의 알려진 한계).
+<li>풀어 둔 폴더를 원하는 곳에 둡니다. 예: <code>D:\KakaoKit</code>. 짧은 영문·숫자 이름을 권장합니다. 폴더 이름에 <code>%PATH%</code> 처럼 <code>%이름%</code> 꼴은 넣지 마세요(15장의 알려진 한계).
 </li>
 <li>폴더 안에 <code>시작.bat</code>, <code>kakao.cmd</code>, <code>src</code> 폴더가 보이면 준비가 끝난 것입니다.
 </li>
@@ -625,7 +625,21 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody></table></div>
 <a id="changelog"></a>
 <h2>14. 업데이트 내용 요약 (펼쳐 보기)</h2>
-<p>제목을 누르면 내용이 펼쳐집니다. 모든 작업은 2026-10-27에 이루어졌습니다. 시험 개수는 그 시점에 통과한 자동 시험의 수입니다.</p>
+<p>제목을 누르면 내용이 펼쳐집니다. 작업은 2026-10-27부터 2026-10-28까지 이루어졌습니다. 시험 개수는 그 시점에 통과한 자동 시험의 수입니다.</p>
+<details>
+<summary><strong>저장소 정리 (M0)</strong> — 시험 149개 → 157개</summary>
+<ul>
+<li><code>시작.bat</code> 이 폴더 이름에 <code>^</code> 나 <code>%</code>(예: <code>A^B</code>, <code>A%20B</code>)가 있으면 버전 줄도 오류 안내도 없이 끝나던 문제를 고쳤습니다. 이제 그 폴더로 들어간 뒤 특수 글자가 없는 상대 경로로 <code>kakao.cmd</code> 를 부르고, 실패하면 한글 안내를 보여 줍니다. 종료 코드가 음수여도(예: -196608) 실패로 봅니다.
+</li>
+<li>알려진 한계: <code>%PATH%</code> 처럼 존재하는 환경 변수 이름을 <code>%</code> 로 감싼 폴더 이름은 윈도우가 <code>시작.bat</code> 을 열기 전에 이름을 바꿔 버려 고칠 수 없습니다. 탐색기에서 더블클릭했을 때의 동작은 확인하지 못했습니다.
+</li>
+<li>한글이 들어간 폴더 경로에서 <code>Guard</code> 시험 1개가 실패하던 것은 시험 도우미가 임시 파일을 BOM 없이 써서 생긴 시험 쪽 문제였고, 제품 코드는 정상이었습니다. 고쳤습니다.
+</li>
+<li><code>.gitignore</code> 에 <code>.omc/</code>, <code>.codex/</code>, 화면 캡처(<code>captures/</code>, <code>*.png</code>, <code>*.jpg</code>)를 추가했습니다. 캡처에는 다른 방의 이름이 찍힐 수 있기 때문입니다.
+</li>
+<li>시험 8개를 추가했습니다(<code>시작.bat</code> 폴더 이름별 6개, 실패 시 한글 안내 1개, <code>.gitignore</code> 1개).
+</li></ul>
+</details>
 <details>
 <summary><strong>GitHub 비공개 저장소와 라이선스 반영</strong> — 시험 148개 → 149개</summary>
 <ul>
@@ -742,7 +756,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <div class="table-wrap"><table>
 <thead><tr><th>증상</th><th>원인</th><th>해결</th></tr></thead>
 <tbody>
-<tr><td><code>시작.bat</code> 을 열면 검은 창이 잠깐 보이고 바로 사라집니다</td><td>압축 파일 안에서 바로 실행했거나, 폴더 이름에 <code>%</code> 가 있습니다.</td><td>압축을 완전히 풀고, <code>%</code> 가 없는 폴더 이름의 곳으로 옮겨 다시 실행하세요.</td></tr>
+<tr><td><code>시작.bat</code> 을 열면 검은 창이 잠깐 보이고 바로 사라집니다</td><td>압축 파일 안에서 바로 실행했거나, 폴더 이름이 <code>%PATH%</code> 처럼 <code>%이름%</code> 꼴입니다.</td><td>압축을 완전히 풀고, 짧은 영문·숫자 폴더 이름의 곳으로 옮겨 다시 실행하세요. 실행하지 못했을 때는 창에 실행하지 못했다는 안내가 나옵니다.</td></tr>
 <tr><td><code>'kakao.cmd' is not recognized as an internal or external command</code> (한글 윈도우에서는 같은 뜻의 한글 문구)</td><td>현재 폴더의 프로그램을 이름만으로 찾지 못하게 하는 윈도우 설정입니다.</td><td><code>.\kakao.cmd version</code> 처럼 앞에 <code>.\</code> 를 붙이거나 전체 경로로 실행하세요.</td></tr>
 <tr><td>PowerShell에서 <code>kakao version</code> 이 안 됩니다</td><td>PowerShell은 현재 폴더의 프로그램을 <code>.\</code> 없이는 실행하지 않습니다.</td><td><code>.\kakao.cmd version</code> 을 입력하세요.</td></tr>
 <tr><td>한글이 <code>???</code> 나 이상한 글자로 보입니다</td><td>창의 글자표 문제이거나, <code>.ps1</code> 파일을 BOM 없이 저장했습니다.</td><td><code>시작.bat</code> 으로 실행하세요. 파일을 고칠 일이 있다면 <code>.ps1</code> 은 "UTF-8 (BOM 포함)"으로 저장하거나 <code>tools\Write-Bom.ps1 -All</code> 로 보정하세요.</td></tr>
@@ -805,7 +819,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p><strong>Q14. <code>시작.bat</code> 이 바로 닫혀요.</strong></p>
 <p><a href="#troubleshooting">15장</a>의 첫 번째 항목을 보세요.</p>
 <p><strong>Q15. 폴더를 다른 곳으로 옮겨도 되나요?</strong></p>
-<p>됩니다. 폴더째 옮기세요. 다만 폴더 이름에 <code>%</code> 가 들어가면 <code>시작.bat</code> 이 실패합니다.</p>
+<p>됩니다. 폴더째 옮기세요. 폴더 이름에 <code>^</code> 나 <code>%</code> 가 있어도 <code>시작.bat</code> 은 동작합니다(2026-10-28 수정). 다만 <code>%PATH%</code> 처럼 존재하는 환경 변수 이름을 <code>%</code> 로 감싼 폴더 이름은 윈도우가 먼저 바꿔 버려 실행되지 않습니다.</p>
 <p><strong>Q16. 설정 파일을 직접 고쳐도 되나요?</strong></p>
 <p>권장하지 않습니다. 허용 목록을 사람이 아닌 방법으로 바꾸는 길이 되므로, 키트는 이상한 값이 보이면 모두 "거부" 쪽으로 처리합니다.</p>
 <p><strong>Q17. 오픈소스인가요? 회사에서 써도 되나요?</strong></p>
@@ -920,14 +934,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <div class="table-wrap"><table>
 <thead><tr><th>시험 파일</th><th>개수</th><th>검사하는 것</th></tr></thead>
 <tbody>
-<tr><td><code>Bootstrap.Tests.ps1</code></td><td>12</td><td>한글 깨짐 방지 규칙(BOM·줄 끝), 관리자 권한 요청과 Program Files·HKLM 쓰기가 없음, 한글 문구와 데이터 폴더 위치, 오류 설정 고정 규칙, <code>version</code> 과 모르는 명령의 동작</td></tr>
+<tr><td><code>Bootstrap.Tests.ps1</code></td><td>20</td><td>한글 깨짐 방지 규칙(BOM·줄 끝), 관리자 권한 요청과 Program Files·HKLM 쓰기가 없음, 한글 문구와 데이터 폴더 위치, 오류 설정 고정 규칙, <code>시작.bat</code> 이 폴더 이름의 특수 글자에서도 동작함, <code>.gitignore</code> 항목, <code>version</code> 과 모르는 명령의 동작</td></tr>
 <tr><td><code>Config.Tests.ps1</code></td><td>30</td><td>허용 목록, 권한, 사람만 변경, 동의, 손으로 고친 이상한 설정</td></tr>
 <tr><td><code>Log.Tests.ps1</code></td><td>11</td><td>본문 없는 기록, 기록 파일 정리, 오류 보고서</td></tr>
 <tr><td><code>Guard.Tests.ps1</code></td><td>39</td><td>문지기: 창 확인, 허용 키, 사람 손 감지, 동시 실행 잠금, 클릭 안전, 소스에 Esc 등 위험한 키 코드가 없음, 실제 윈도우 기능 읽기(입력은 보내지 않음)</td></tr>
 <tr><td><code>Clip.Tests.ps1</code></td><td>9</td><td>클립보드 저장·교체·복원, 이미지·파일이면 중단</td></tr>
 <tr><td><code>Parse.Tests.ps1</code></td><td>20</td><td>내보내기 파일 읽기, 이상한 날짜·시각, 줄 끝 차이</td></tr>
 <tr><td><code>Readme.Tests.ps1</code></td><td>28</td><td>설명서 변환기, 설명서가 실제(시험 개수·명령 상태·버전·화면 문구·링크)와 같은지, LICENSE 전문과 권리자</td></tr>
-<tr><td><strong>합계</strong></td><td><strong>149</strong></td><td></td></tr>
+<tr><td><strong>합계</strong></td><td><strong>157</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>설명서 html 만들기</h3>
 <p>설명서의 원본은 <code>README.md</code> 와 <code>README.en.md</code> 입니다. html은 아래 도구로 만들며, 손으로 고치지 않습니다.</p>
