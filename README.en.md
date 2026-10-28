@@ -9,7 +9,7 @@
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
-Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
+Document date: 2026-10-29 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) + gatekeeper Hangul-key exception · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
 
 - ✅ = works right now. ⏳ = does not work yet (planned).
 - In this document `kakao` is shorthand. You actually type `.\kakao.cmd`. The reason is in [Chapter 6](#run).
@@ -92,7 +92,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 | 4 | Key input layer and safety device (the "gatekeeper") | ✅ Parts done (testing real input into KakaoTalk is ⏳) |
 | 5 | Saving and restoring the clipboard | ✅ Parts done |
 | 6 | Reading export files (parser) | ✅ Parts done |
-| 7 | Opening a room | ⏳ Planned |
+| 7 | Opening a room | ⏳ Preliminary research under way (the kit's code has not yet sent any input to KakaoTalk) |
 | 8 | Sending a message | ⏳ Planned |
 | 9 | Export, read, search | ⏳ Planned |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
@@ -106,20 +106,20 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 |---|---|
 | Operating system | Windows 11 Home, build 10.0.26300 |
 | PowerShell | Windows PowerShell 5.1 (5.1.26100.9711) |
-| KakaoTalk PC | 26.9.0.5337 (the only verified version) |
+| KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, which has not been tested yet (it is not on the tested-version list) |
 | Display language | English (en-US). Even so, every message of the kit is in Korean. |
-| Monitors | Several (including negative coordinates on a secondary monitor) |
+| Monitors | 4 (including negative coordinates on a secondary monitor). Display scaling differs per monitor; the monitor holding KakaoTalk is at 150% |
 | Rights | No administrator rights (normal user) |
 | Default terminal | Windows Terminal |
 
 ### What has not been verified yet (an honest list)
 
-- Testing, with the kit's own code, that keys really reach KakaoTalk: this starts at step 7. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
+- Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the kit's code has **never sent a key, click or paste to KakaoTalk.** In the step 7 preliminary research, reading the window list passed, and the first input attempt was stopped by the safety guard before any input (a Hangul/English key problem; see chapter 14). (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
 - Actually sending Korean text, multi-line text, long messages and emoji
-- Searching, opening and exporting in ordinary rooms (1:1 and group chats)
+- Searching, opening and exporting in ordinary rooms (1:1 and group chats) (the test room is an open chat room, so its window title and search results may differ from ordinary rooms)
 - Behaviour when KakaoTalk is closed or shows the login screen
 - How to tell rooms apart when several rooms have the same name
-- False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together
+- False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
 - How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
 - Static analysis tool (PSScriptAnalyzer): it is not installed, so it could not be run.
 - Reaction of antivirus software and SmartScreen
@@ -336,7 +336,7 @@ KakaoTalk is a house without an official front door (API). So this kit places a 
 
 1. Check the allowed list: only a room whose name matches character for character passes.
 2. Open the room: not by clicking on the list by eye, but only through search. If the search result is not exactly 1 item, it stops.
-3. Gatekeeper check: whether the window belongs to KakaoTalk, whether the window title is exactly the room name, whether it is in front, whether a person touched the keyboard or mouse, and whether any key is held down.
+3. Gatekeeper check: whether the window belongs to KakaoTalk, whether the window title is exactly the room name, whether it is in front, whether a person touched the keyboard or mouse, and whether any key is held down (the Hangul/English key is not counted).
 4. Save the clipboard: safely keeps the text you currently have copied (only when it is text).
 5. Put the text to send on the clipboard and confirm it really went in.
 6. Paste with `Ctrl+V` and send with `Enter`.
@@ -358,6 +358,7 @@ Why paste instead of typing: Korean text, emoji and long text then do not lose o
 - `Esc` is never sent. In KakaoTalk `Esc` closes the chat window (a mistake that really happened).
 - The ≡ menu at the top right of the window is never clicked. Inside it, "Delete all chat content" and "Leave chat room" sit right next to each other.
 - "Check" and "input" are bundled into one action, so there is no gap between checking and typing in which the window could change.
+- If any key is held down right before input, nothing is sent: a Ctrl combination sent while a person holds a key would turn into a wrong shortcut. **Only the Hangul/English key is exempt.** On some keyboards and input methods that key is read as held down even with hands off (confirmed on this PC), and blocking it would mean nothing could ever be sent. No other key has an exception.
 
 <a id="workflow"></a>
 ## 10. Workflows
@@ -416,7 +417,7 @@ Start of work
   -> wait until the keyboard and mouse are idle (Wait-UserIdle)
   -> make sure no other kit job runs at the same time (named lock)
   -> check the target window: owned by KakaoTalk? exact same title? in front?
-  -> is the key in the allowed-key table? is no other key held down?
+  -> is the key in the allowed-key table? is no other key held down? (Hangul/English key excluded)
   -> has no person's input happened since the last input?
   -> run [check + input] together as one action
   If anything is wrong: 0 inputs, a Korean error message, exit code 2
@@ -478,7 +479,7 @@ Start of work
 | Promise | How | Status |
 |---|---|---|
 | Only allowed rooms | The room name must match character for character (case, spaces and invisible characters are all distinguished). Two rooms with the same name are refused. | ✅ Tested |
-| Gatekeeper right before input | Owned by KakaoTalk, exact title match, window in front, no human hands, no key held down. If any one is wrong, 0 inputs. | ✅ Tested with fake parts (real KakaoTalk is ⏳) |
+| Gatekeeper right before input | Owned by KakaoTalk, exact title match, window in front, no human hands, no key held down (only the Hangul/English key is exempt). If any one is wrong, 0 inputs. | ✅ Tested with fake parts (real KakaoTalk is ⏳) |
 | 5 allowed keys, no Esc | The same allowed table exists on both sides of the code (PowerShell, C#), and a test checks that there is no Esc code. | ✅ |
 | Human-hand detection | Waits until idle before starting, and stops if human input is detected during the work. | ✅ (checking false alarms is ⏳) |
 | No running twice at once | A named lock (`Local\KakaoKit.InputLock`) | ✅ |
@@ -571,7 +572,18 @@ The settings and records the kit creates are stored separately in your **user fo
 <a id="changelog"></a>
 ## 14. Update summary (click to expand)
 
-Click a title to expand it. Work was done from 2026-10-27 to 2026-10-28. The test counts are the number of automated tests that passed at that point.
+Click a title to expand it. Work was done from 2026-10-27 to 2026-10-29. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Gatekeeper: Hangul-key exception</strong> — tests 180 → 184</summary>
+
+- When the real-KakaoTalk spike (step 7) started, the gatekeeper stopped before the first click, because the pressed-key check read the Hangul/English key as held down all the time. I confirmed it by only reading key state without sending any key: it was held in 20 of 20 reads, even 30 seconds after the last input. The kit could not send a single input.
+- The pressed-key check now leaves out that one key. It is a mode-switch key, so a paste or click sent while it is held cannot turn into a wrong shortcut. Every other key (Ctrl, Shift, Alt, Esc, Delete, the Windows key, letters and so on) is still blocked. This judgment rests on the nature of the key; it has not yet been confirmed in real KakaoTalk.
+- Four tests were added (only the Hangul key held passes; Hangul plus Ctrl held is refused because of Ctrl; every other key in the scanned range is refused one by one; the exception list has exactly one entry).
+- After the fix I read the key state again on this PC and saw it change to no key held (0).
+- I brought the guide in line with the development state: the step 7 marker and the verification environment in chapter 2 (KakaoTalk 26.9.1.5339 is a version that has not been tested yet; 4 monitors and their scaling), the "not verified yet" list, three descriptions of the gatekeeper (the Hangul/English key exception), the "another key is held down" remedy in chapter 15, the FAQ in chapter 16, and the note in 17.2 that the terms of the updated version have not been checked again.
+
+</details>
 
 <details>
 <summary><strong>Minimal version check (M7-0)</strong> — tests 157 → 180</summary>
@@ -724,7 +736,7 @@ These messages are already in the code, but the matching commands are not connec
 | `대상 창이 맨 앞에 있지 않습니다. 입력하지 않았습니다.` | Another window came to the front. | Close or minimise the other window and run it again. |
 | `대상 창이 카카오톡이 아닙니다. 입력하지 않았습니다.` | The window it was going to type into does not belong to KakaoTalk. | Open KakaoTalk again and run it. |
 | `다른 키트 작업이 이미 실행 중입니다. 끝난 뒤 다시 해 주세요.` | The kit is already doing another job. | Wait for it to finish and run it again. |
-| `다른 키가 눌려 있어 입력하지 않았습니다. 키보드에서 손을 떼 주세요.` | A key was being held down. | Release all keys and run it again. |
+| `다른 키가 눌려 있어 입력하지 않았습니다. 키보드에서 손을 떼 주세요.` | A key was being held down (the Hangul/English key is not counted). Either a key was being pressed, or the keyboard or input method keeps reporting a released key as held. | Release all keys and run it again. If it keeps appearing with your hands off, replug the keyboard into another USB port or try another keyboard, and if it is still the same, tell the developer which key appears to be held. |
 | `클릭할 위치가 창 밖입니다. 입력하지 않았습니다.` or `클릭할 자리가 다른 창에 가려져 있습니다. 입력하지 않았습니다.` | The place to click is not safe. It did not click. | Keep the KakaoTalk window in front and uncovered, then run it again. |
 | `클립보드에 이미지나 파일이 들어 있어 작업하지 않았습니다. 클립보드를 비우거나 글자를 복사한 뒤 다시 해 주세요.` | Something that is not text is copied, so it cannot be restored. | Empty the clipboard or copy some text, then run it again. |
 | `클립보드를 다른 프로그램이 쓰고 있어 작업하지 못했습니다. 잠시 뒤 다시 해 주세요.` | Another program is holding the clipboard. | Run it again a little later. |
@@ -777,7 +789,7 @@ Yes. The development PC has an English display, and the kit's messages are alway
 
 **Q10. What happens when KakaoTalk is updated?**
 
-Only 26.9.0.5337 was verified. In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
+Only 26.9.0.5337 was verified (KakaoTalk on this PC later updated itself to 26.9.1.5339, which has not been tested yet). In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
 
 **Q11. May I send messages to friends automatically?**
 
@@ -825,7 +837,7 @@ Yes. `README.html` is a document that works as a single file; just open it in a 
 
 ### 17.2 Kakao's terms of service and operating policy
 
-- At the time of development (2026-10-27), it was confirmed that clause 2.2 of the terms of the KakaoTalk installed on this PC (`EULA_ko.txt` in the install folder) prohibits reverse engineering, decompiling and disassembling. So this kit decided not to use such methods.
+- At the time of development (2026-10-27), it was confirmed that clause 2.2 of the terms of the KakaoTalk installed on this PC (`EULA_ko.txt` in the install folder) prohibits reverse engineering, decompiling and disassembling. So this kit decided not to use such methods. KakaoTalk later updated itself (26.9.1.5339), and **the terms of the updated version have not been checked again.**
 - However, whether Kakao's separate "operating policy" has clauses about automated programs **could not be checked.** So it cannot be said for certain whether using this tool goes against the terms or the operating policy, and there is a possibility of restrictions on the KakaoTalk account (a warning, a temporary suspension, etc.).
 - Terms and policies can change. Before using the tool, check the latest terms and operating policy yourself.
 - The kit's risk-reducing measures (only allowed rooms, no bulk sending, a 2-second gap, human-hand detection) lower the risk but do not remove it.
@@ -914,12 +926,12 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Bootstrap.Tests.ps1` | 20 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
-| `Guard.Tests.ps1` | 39 | The gatekeeper: window check, allowed keys, human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
+| `Guard.Tests.ps1` | 43 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **180** | |
+| **Total** | **184** | |
 
 ### Building the guide html
 

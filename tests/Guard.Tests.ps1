@@ -449,4 +449,32 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
     It 'HeldKey runs without throwing' {
         ([KakaoWin32]::HeldKey() -is [int]) | Should Be $true
     }
+
+    # 한/영 키(0x15)는 키보드·입력기에 따라 손을 떼도 계속 눌린 것으로 읽힌다(이 PC 실측). 그 키만 "손이 닿음"으로 세지 않는다.
+    It 'HeldKeyFrom does not count the Hangul key (0x15) as a held key' {
+        $down = @(0x15)
+        [KakaoWin32]::HeldKeyFrom([Func[int, bool]]({ param($vk) $down -contains $vk }.GetNewClosure())) | Should Be 0
+    }
+
+    It 'HeldKeyFrom still reports any other key even while the Hangul key is down' {
+        $down = @(0x15, 0x11)
+        [KakaoWin32]::HeldKeyFrom([Func[int, bool]]({ param($vk) $down -contains $vk }.GetNewClosure())) | Should Be 0x11
+    }
+
+    It 'HeldKeyFrom reports every other scanned key one by one (Ctrl, Shift, Alt, Esc, Delete, Win, letters, Enter ...)' {
+        $wrong = @()
+        foreach ($key in 0x08..0xDF) {
+            if ($key -eq 0x15) { continue }
+            $down = @($key)
+            $got = [KakaoWin32]::HeldKeyFrom([Func[int, bool]]({ param($vk) $down -contains $vk }.GetNewClosure()))
+            if ($got -ne $key) { $wrong += $key }
+        }
+        ($wrong -join ',') | Should Be ''
+    }
+
+    It 'the ignore list is exactly the Hangul key and nothing else' {
+        $ignored = @([KakaoWin32]::IgnoredHeldKeys())
+        $ignored.Count | Should Be 1
+        $ignored[0] | Should Be 0x15
+    }
 }

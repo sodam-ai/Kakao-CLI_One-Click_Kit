@@ -108,12 +108,22 @@ public static class KakaoWin32 {
         GetLastInputInfo(ref li);
         return unchecked((uint)Environment.TickCount - li.dwTime);
     }
-    // 지금 눌려 있는 키 하나(없으면 0). 사람이 키를 누른 채 키트가 Ctrl 조합을 보내면 엉뚱한 단축키가 되기 때문이다.
-    public static int HeldKey() {
+    // 눌려 있어도 "사람이 키를 눌렀다"로 세지 않는 키. 한/영 키(VK_HANGUL 0x15)만 해당한다.
+    // 키보드·입력기에 따라 이 키는 손을 떼도 계속 눌린 것으로 읽힌다(실측: 마지막 입력 후 30초가 지나도 20번 중 20번). 이 키를 막으면 그런 PC에서는 키트가 입력을 한 번도 못 보낸다.
+    // 모드 전환 키라서 눌린 채 Ctrl+V·클릭이 가도 엉뚱한 단축키가 되지 않는다. 다른 키는 여기에 넣지 않는다(시험이 정확히 1개인지 확인한다).
+    public static int[] IgnoredHeldKeys() { return new int[] { 0x15 }; }
+    // isDown(vk) 로 키 상태를 물어 눌린 키 하나를 돌려준다(없으면 0). 시험이 가짜 isDown 을 끼워 넣을 수 있게 따로 뺐다.
+    public static int HeldKeyFrom(Func<int, bool> isDown) {
+        int[] ignored = IgnoredHeldKeys();
         for (int vk = 0x08; vk <= 0xDF; vk++) {
-            if ((GetAsyncKeyState(vk) & 0x8000) != 0) return vk;
+            if (Array.IndexOf(ignored, vk) >= 0) continue;
+            if (isDown(vk)) return vk;
         }
         return 0;
+    }
+    // 지금 눌려 있는 키 하나(없으면 0). 사람이 키를 누른 채 키트가 Ctrl 조합을 보내면 엉뚱한 단축키가 되기 때문이다.
+    public static int HeldKey() {
+        return HeldKeyFrom(delegate (int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; });
     }
     public static void PostClose(long h) { PostMessageW(new IntPtr(h), 0x0010, IntPtr.Zero, IntPtr.Zero); }
     // 가장 좋은 DPI 설정(모니터마다 배율이 달라도 실제 픽셀 좌표)을 시도하고, 안 되면 기본 설정으로 되돌아간다.
