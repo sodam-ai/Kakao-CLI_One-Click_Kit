@@ -357,7 +357,8 @@ Describe 'Guard: 동시 실행 잠금' {
             ('. ''' + $lib + '\Guard.ps1''')
             ('try { Enter-KitLock -Name ''' + $LockName + '''; Exit-KitLock; exit 0 } catch { $c = $_.Exception.ExitCode; if ($c) { exit [int]$c } else { exit 99 } }')
         )
-        [System.IO.File]::WriteAllLines($script, $body)
+        # BOM 이 있어야 한다: 없으면 PowerShell 5.1 이 한글이 든 경로($lib)를 cp949 로 잘못 읽어 자식 프로세스가 엉뚱하게 끝난다.
+        [System.IO.File]::WriteAllLines($script, $body, (New-Object System.Text.UTF8Encoding($true)))
         try {
             $psi = New-Object System.Diagnostics.ProcessStartInfo
             $psi.FileName = 'powershell.exe'
