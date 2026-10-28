@@ -23,3 +23,10 @@ function Get-ThrownError([scriptblock]$Body) {
     try { & $Body } catch { return $_.Exception }
     return $null
 }
+
+# 실제 카카오톡을 조작하는 시험(E2E)은 환경 변수 KAKAO_E2E 가 정확히 글자 1 일 때만 실행한다.
+# 0·true·yes·공백이 붙은 1 등 다른 값은 모두 꺼짐이다. E2E 시험을 만들 때는 Describe 전체를 이 함수의 if 안에 둔다
+# (Pester 의 -Skip 은 "건너뜀"으로 세어져 기준선 "건너뜀 0"이 깨진다).
+function Test-E2EEnabled {
+    return [string]::Equals($env:KAKAO_E2E, '1', [System.StringComparison]::Ordinal)
+}

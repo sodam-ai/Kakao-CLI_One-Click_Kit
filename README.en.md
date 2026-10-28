@@ -9,7 +9,7 @@
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
-Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
+Document date: 2026-10-28 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
 
 - ✅ = works right now. ⏳ = does not work yet (planned).
 - In this document `kakao` is shorthand. You actually type `.\kakao.cmd`. The reason is in [Chapter 6](#run).
@@ -232,7 +232,7 @@ An environment variable is a named setting stored in Windows. **The only one the
 | Name | Who sets it | Meaning | Default |
 |---|---|---|---|
 | `KAKAO_KIT_HOME` | User (optional) | Moves the kit's data folder (settings, records, exports) to this folder. Originally meant for automated tests. | None → `%LOCALAPPDATA%\KakaoKit` |
-| `KAKAO_E2E` | Developer (optional) | A name reserved for running tests that operate the real KakaoTalk when set to `1`. No test reads this variable yet; it is planned to be used from step 7 (⏳). | None → not run |
+| `KAKAO_E2E` | Developer (optional) | A name reserved for running tests that operate the real KakaoTalk when set to `1`. The test helper `Test-E2EEnabled` (`tests\_Load.ps1`) reads this variable and turns on only when the text is exactly `1`. No test uses that helper yet; it is planned to be used from step 7 (⏳). | None → not run |
 | `NoDefaultCurrentDirectoryInExePath` | Windows security setting | When `1`, programs in the current folder are not found by name alone. The kit does not change it and you do not need to. | Differs per PC (1 on this PC) |
 | `LOCALAPPDATA` | Windows | The base location of the user data folder. | Decided by Windows |
 
@@ -459,7 +459,7 @@ Start of work
 | `Ocr.ps1`, `Room.ps1` | Checking search results and opening rooms | ⏳ step 7 |
 | `Send.ps1` | Sending messages | ⏳ step 8 |
 | `Export.ps1`, `Search.ps1` | Export, read, search | ⏳ step 9 |
-| `Status.ps1` | Status check, KakaoTalk version and login check | ⏳ step 10 |
+| `Status.ps1` | Reads the installed KakaoTalk version (cross-checking the registry against the running process) and decides whether it is a version that was actually tested. Read-only. The login check and the full status check are added in step 10. | ✅ Parts (minimal) |
 | `Menu.ps1` | Numbered menu | ⏳ step 11 |
 | `Install.ps1` | First run, update, uninstall | ⏳ step 12 |
 
@@ -572,6 +572,17 @@ The settings and records the kit creates are stored separately in your **user fo
 ## 14. Update summary (click to expand)
 
 Click a title to expand it. Work was done from 2026-10-27 to 2026-10-28. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Minimal version check (M7-0)</strong> — tests 157 → 180</summary>
+
+- KakaoTalk updated itself from `26.9.0.5337` to `26.9.1.5339`. Prompted by that, I added `Status.ps1` (minimal), which reads the installed KakaoTalk version and decides whether it is a version that was actually tested. It does not open or operate KakaoTalk; it only reads the registry value and the file version of the running process.
+- If the two values differ, if running processes differ from each other, or if a value cannot be read, the version is returned empty and treated as not tested (when unsure, the safe side).
+- The list of tested versions (`config\verified-versions.json`) is unchanged. `26.9.1.5339` on this PC is not on it, so the verdict is not a tested version. It will be added only after a real send test on KakaoTalk passes.
+- Added the test helper `Test-E2EEnabled`, which reads the switch that turns on tests that operate the real KakaoTalk. It turns on only when the text is exactly `1`. No test uses it yet.
+- Added 23 tests (12 with a fake registry and fake processes, 8 for the version verdict, 2 for read-only, 1 for the switch).
+
+</details>
 
 <details>
 <summary><strong>Repository cleanup (M0)</strong> — tests 149 → 157</summary>
@@ -906,8 +917,9 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Guard.Tests.ps1` | 39 | The gatekeeper: window check, allowed keys, human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
+| `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **157** | |
+| **Total** | **180** | |
 
 ### Building the guide html
 
