@@ -263,9 +263,9 @@ How to check: in cmd type `echo %errorlevel%`, in PowerShell type `$LASTEXITCODE
 
 - Check the version: typing `.\kakao.cmd version` prints `카카오톡 키트 1.0.0` (exit code 0).
 - See the temporary guide screen: double-click `시작.bat`.
-- Typing only `.\kakao.cmd` with no command prints `명령이 없습니다. 도움말은 "kakao help" 로 볼 수 있습니다.` ("There is no command. See help with kakao help.") (exit code 1).
-- Typing an unknown command prints `알 수 없는 명령입니다: <what you typed>  (도움말: kakao help)` ("Unknown command: ... (help: kakao help)") (exit code 1).
-- Known mismatch: the message above points to `kakao help`, but `help` does not exist yet (⏳ step 11). The message is also planned to be changed to `.\kakao.cmd help`.
+- Typing only `.\kakao.cmd` with no command prints `명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기)` ("There is no command. Commands you can use now: version (show the version).") (exit code 1).
+- Typing an unknown command prints `알 수 없는 명령입니다: <what you typed>  (지금 쓸 수 있는 명령: version)` ("Unknown command: ... (commands you can use now: version)") (exit code 1).
+- The message used to point to `kakao help`, which did not exist; this was fixed on 2026-10-31. The `help` command itself does not exist yet (⏳ step 11).
 
 ### How it will look (⏳ planned, based on the design document)
 
@@ -510,7 +510,7 @@ The kit does not send chat content over the internet. However, **if you hand a c
 
 ### 12.3 Known security limits (written down, not hidden)
 
-1. **How `kakao.cmd` interprets arguments**: because Windows cmd interprets the command line first, if you call it by pasting untrusted text such as a message straight into the command-line arguments, `&` or `%name%` can run as commands. This is how cmd is built, and escaping cannot fully stop it. So the message text is planned to be accepted only through `--file` or standard input, and automated callers are planned to call `powershell -NoProfile -ExecutionPolicy Bypass -File src\kakao.ps1` directly (⏳ steps 8 and 11). The current version uses what you type only to compare command names and never runs it, so it is not affected (tested with 20 kinds of special characters).
+1. **How `kakao.cmd` interprets arguments**: because Windows cmd interprets the command line first, if you call it by pasting untrusted text such as a message straight into the command-line arguments, `&` or `%name%` can run as commands. This is how cmd is built, and escaping cannot fully stop it. So the message text is planned to be accepted only through `--file` or standard input, and automated callers are planned to call `powershell -NoProfile -ExecutionPolicy Bypass -File src\kakao.ps1` directly (⏳ steps 8 and 11). What was checked directly on 2026-10-31: when `&` or `|` reaches `kakao.cmd` without quotes, what follows it **really runs as a command.** A quoted one, and calling `src\kakao.ps1` directly (special characters in it do not run), are safe, and both are pinned by tests. Right now there is only `version`, and it uses what you type only to compare command names, so the risk when you type it yourself is low, but you must not pass untrusted text such as a message through `kakao.cmd`.
 2. **The settings file is a plain text file.** A person or a program running under the same user account could edit it and change the allowed list. The "only a person may change" rule is kept only at the command level. Options such as a read-only settings file will be examined in step 12.
 3. **The `KAKAO_KIT_HOME` environment variable** can change the data folder (originally for testing). It also applies in real use, so using a folder other than the default is planned to be shown on every command (⏳ step 11).
 4. **Real behaviour of the key input method**: whether the newly built input method (SendInput) really works in KakaoTalk, and how false alarms of human-hand detection turn out, has not yet been checked for real (⏳ steps 7 and 8).
@@ -658,7 +658,7 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-30. The tes
 - When saving the settings failed, an English system error appeared; it was replaced with a Korean message.
 - Room names with invisible characters or 101 or more characters are refused.
 - Export parser: fixed English errors or wrong times from strange dates and times, messages without text being merged into the previous message, an English error when given a folder path, and files whose line ends are only CR not being readable.
-- Confirmed that 20 kinds of command-line special characters (`& | ^ ! ; $()`, Korean text, emoji, 6000 characters, etc.) are not executed as commands.
+- Confirmed that 20 kinds of command-line special characters (`& | ^ ! ; $()`, Korean text, emoji, 6000 characters, etc.) are not executed as commands. (Corrected on 2026-10-31: this holds only when they are quoted or when `src\kakao.ps1` is called directly. A `&` or `|` that reaches `kakao.cmd` without quotes does run. See "Known limits" in chapter 12.)
 
 </details>
 
@@ -937,7 +937,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 
 | Test file | Count | What it checks |
 |---|---|---|
-| `Bootstrap.Tests.ps1` | 20 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command |
+| `Bootstrap.Tests.ps1` | 24 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command, no pointer to a `help` command that does not exist, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
 | `Guard.Tests.ps1` | 43 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
@@ -947,7 +947,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Ocr.Tests.ps1` | 47 | The window-size check and the reason a stop is explained (read-only), deciding whether the search result is only the room name (second row, search-box text, ad, longer names, digits glued to the name, another room's preview text, the name column, the click height, the window size, space differences), the real screen layout (the icon read as 0, left-menu text, a line with the front of the name missing, several rows), checking that the window is not covered, the fake-capture connection, the text-reading engine (including word boxes), no writing to disk and no input |
 | `Room.Tests.ps1` | 26 | Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **257** | |
+| **Total** | **261** | |
 
 ### Building the guide html
 
