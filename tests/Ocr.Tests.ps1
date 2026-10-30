@@ -17,8 +17,8 @@ $row3Prev = New-Line '아래쪽 어딘가의 글자' 220 400 420            # �
 $ad = New-Line '광고 문구' 60 636 660                              # 광고 영역(중심 0.86): 결과 영역 밖
 
 # 판정 함수를 짧게 부르는 도우미(기본값은 위의 실제 배치).
-function Test-Single($lines, [string]$name = '테스트방', [double]$clickY = $ClickY, [double]$width = $W, [double]$height = $H) {
-    return (Test-SingleResultLines -Lines $lines -ExpectedName $name -ImageWidth $width -ImageHeight $height -ClickRelY $clickY)
+function Test-Single($lines, [string]$name = '테스트방', [double]$clickY = $ClickY, [double]$width = $W, [double]$height = $H, [double]$scale = 1.5) {
+    return (Test-SingleResultLines -Lines $lines -ExpectedName $name -ImageWidth $width -ImageHeight $height -ClickRelY $clickY -Scale $scale)
 }
 
 Describe 'Ocr: Test-SingleResultLines (정확히 1건인가, 화면 없이 판정)' {
@@ -85,9 +85,12 @@ Describe 'Ocr: Test-SingleResultLines (정확히 1건인가, 화면 없이 판�
         Test-Single @($searchBox, $row1Name, $row1Prev1, $row1Prev2) '테스트방' 0.60 | Should Be $false
     }
 
-    It 'refuses a window shape other than the measured one, but tolerates a small size difference' {
-        Test-Single @($searchBox, $row1Name, $row1Prev1) '테스트방' $ClickY 900 500 | Should Be $false
-        Test-Single @($searchBox, $row1Name, $row1Prev1) '테스트방' $ClickY 560 730 | Should Be $true
+    It 'refuses a window size other than the measured 588x753 (1.5% tolerance), at the edges of the tolerance and just outside it' {
+        $three = @($searchBox, $row1Name, $row1Prev1)
+        Test-Single $three '테스트방' $ClickY 900 500 | Should Be $false
+        Test-Single $three '테스트방' $ClickY 588 753 | Should Be $true
+        foreach ($size in @(580, 753), @(596, 753), @(588, 742), @(588, 764)) { Test-Single $three '테스트방' $ClickY $size[0] $size[1] | Should Be $true }
+        foreach ($size in @(579, 753), @(597, 753), @(588, 741), @(588, 765), @(560, 730), @(640, 753)) { Test-Single $three '테스트방' $ClickY $size[0] $size[1] | Should Be $false }
     }
 
     It 'is false (never throws) for no lines, a null list, an empty name, bad sizes or a bad click height' {
@@ -99,6 +102,196 @@ Describe 'Ocr: Test-SingleResultLines (정확히 1건인가, 화면 없이 판�
         Test-Single @($row1Name) '테스트방' $ClickY $W -5 | Should Be $false
         Test-Single @($row1Name) '테스트방' 0 | Should Be $false
         Test-Single @($row1Name) '테스트방' 1.5 | Should Be $false
+    }
+}
+
+# 실제 화면(588x753, 오픈채팅 탭)을 한국어 글자 읽기로 읽은 결과를 본뜬 가짜 줄이다. 값은 픽셀이고 개인정보는 없다.
+# 실제로 확인한 것: 방 이름 앞의 배지 아이콘이 숫자 0 한 글자로 읽히고, 왼쪽 메뉴 아이콘도 0 으로 읽히며,
+# 어떤 행은 이름 앞부분이 통째로 안 읽혀 이름 단어가 오른쪽(0.46)에서 시작했다. 이름 단어는 보통 0.42 에서 시작한다.
+function New-WordLine([object[]]$Words, [double]$Top, [double]$Bottom) {
+    $objs = @($Words | ForEach-Object { [pscustomobject]@{ Text = [string]$_[0]; Left = [double]$_[1]; Right = [double]$_[2] } })
+    [pscustomobject]@{
+        Text   = (($objs | ForEach-Object { $_.Text }) -join ' ')
+        Left   = ($objs | Measure-Object -Property Left -Minimum).Minimum
+        Right  = ($objs | Measure-Object -Property Right -Maximum).Maximum
+        Top    = $Top
+        Bottom = $Bottom
+        Words  = $objs
+    }
+}
+$realTitle = New-WordLine @(@('0', 219, 242), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+$realTime = New-WordLine @(@('오후', 485, 517), @('553', 525, 553)) 229 245
+$realPrev1 = New-WordLine @(@('새로운', 220, 272), @('재팅방이', 280, 349), @('생성듸었습니', 358, 463)) 247 264
+$realPrev2 = New-WordLine @(,@('다.', 221, 240)) 270 286
+$leftMenuBell = New-WordLine @(,@('0', 37, 60)) 472 498
+$leftMenuGear = New-WordLine @(,@('0', 43, 54)) 541 552
+$oneResult = @($realTitle, $realTime, $realPrev1, $realPrev2, $leftMenuBell, $leftMenuGear)
+
+Describe 'Ocr: 실제 화면에서 본 배치(글자 상자 위치로 판정)' {
+    It 'is true for the real one-result screen: the icon read as a stray 0 and the left-menu icons read as characters' {
+        Test-Single $oneResult | Should Be $true
+    }
+
+    It 'ignores text in the left menu column but not a stray glyph inside the result list below the first row' {
+        Test-Single @($realTitle, $realTime, $realPrev1, $leftMenuBell) | Should Be $true
+        $strayInList = New-WordLine @(,@('0', 160, 180)) 480 500
+        Test-Single @($realTitle, $realTime, $realPrev1, $strayInList) | Should Be $false
+    }
+
+    It 'does not care about a glyph from the avatar picture inside the first row, but a glyph below it is a second row' {
+        $avatarInRow = New-WordLine @(,@('들', 151, 164)) 225 240
+        $avatarBelow = New-WordLine @(,@('들', 151, 164)) 555 572
+        Test-Single @($realTitle, $realTime, $avatarInRow) | Should Be $true
+        Test-Single @($realTitle, $realTime, $avatarBelow) | Should Be $false
+    }
+
+    It 'ignores exactly one single-character word in the icon slot, whatever character the reader made of the icon' {
+        foreach ($glyph in '0', 'o', 'O', '©') {
+            $line = New-WordLine @(@($glyph, 219, 242), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+            Test-Single @($line, $realTime, $realPrev1) | Should Be $true
+        }
+    }
+
+    It 'is false when the icon slot holds two characters or two words' {
+        $twoChars = New-WordLine @(@('AI', 219, 242), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        $twoWords = New-WordLine @(@('0', 219, 230), @('o', 232, 242), @('테스트방', 247, 318)) 216 239
+        Test-Single @($twoChars, $realTime, $realPrev1) | Should Be $false
+        Test-Single @($twoWords, $realTime, $realPrev1) | Should Be $false
+    }
+
+    It 'is false when the reader dropped the front of the name so the name word starts too far right (another room that ends with this name)' {
+        $prefixDropped = New-WordLine @(@('0', 219, 242), @('테스트방', 271, 342)) 216 239
+        Test-Single @($prefixDropped, $realTime, $realPrev1) | Should Be $false
+        $noIconPrefixDropped = New-WordLine @(@('테스트방', 271, 342), @('1', 349, 355)) 216 239
+        Test-Single @($noIconPrefixDropped, $realTime, $realPrev1) | Should Be $false
+    }
+
+    It 'accepts the name start only within 3 pixels of the measured 247, with or without an icon word, at every allowed window width' {
+        foreach ($width in 580, 588, 596) {
+            foreach ($start in 244, 247, 250) {
+                $withIcon = New-WordLine @(@('0', 219, 242), @('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                $noIcon = New-WordLine @(@('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                foreach ($line in $withIcon, $noIcon) {
+                    Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+                }
+            }
+            foreach ($start in 243, 251, 252, 254, 255, 262) {
+                $withIcon = New-WordLine @(@('0', 219, 242), @('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                $noIcon = New-WordLine @(@('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                foreach ($line in $withIcon, $noIcon) {
+                    Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+                }
+            }
+        }
+    }
+
+    It 'accepts at most 8 pixels between the icon word and the name (the measured gap is about 5), so an icon far from the name is refused' {
+        $gap8 = New-WordLine @(@('0', 219, 239), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        $gap9 = New-WordLine @(@('0', 219, 238), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        $farIcon = New-WordLine @(@('0', 219, 226), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        foreach ($width in 580, 588, 596) {
+            Test-Single @($gap8, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+            Test-Single @($gap9, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+            Test-Single @($farIcon, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+            Test-Single @($realTitle, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+        }
+    }
+
+    It 'is false when something is glued to or in front of the name, so it is another room' {
+        foreach ($spoof in @(
+                @(@('0', 219, 242), @('0테스트방', 247, 330)),
+                @(@('0', 219, 242), @('내테스트방', 247, 350)),
+                @(@('0', 219, 242), @('A', 247, 260), @('테스트방', 266, 337)),
+                @(@('0', 219, 242), @('테스트방입니다', 247, 380)))) {
+            $line = New-WordLine $spoof 216 239
+            Test-Single @($line, $realTime, $realPrev1) | Should Be $false
+        }
+    }
+
+    It 'accepts the name without an icon word when it starts at the name position, not when it starts at the icon position' {
+        $noIcon = New-WordLine @(@('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        $atIconPosition = New-WordLine @(@('테스트방', 219, 290), @('1', 297, 303)) 216 239
+        Test-Single @($noIcon, $realTime, $realPrev1) | Should Be $true
+        Test-Single @($atIconPosition, $realTime, $realPrev1) | Should Be $false
+    }
+
+    It 'keeps the rule that only a count and symbols may follow the name' {
+        $symbol = New-WordLine @(@('0', 219, 242), @('테스트방', 247, 318), @('1', 325, 331), @('◉', 337, 350)) 216 239
+        $letters = New-WordLine @(@('0', 219, 242), @('테스트방', 247, 318), @('1', 325, 331), @('abc', 337, 365)) 216 239
+        Test-Single @($symbol, $realTime, $realPrev1) | Should Be $true
+        Test-Single @($letters, $realTime, $realPrev1) | Should Be $false
+    }
+
+    It 'is false for the real multi-row screen, even when a second row has exactly the same title' {
+        $row2Title = New-WordLine @(@('0', 219, 242), @('다른방', 271, 383)) 321 344
+        $row2Time = New-WordLine @(@('오후', 485, 517), @('849', 525, 553)) 334 350
+        Test-Single ($oneResult + @($row2Title, $row2Time)) | Should Be $false
+        $row2Same = New-WordLine @(@('0', 219, 242), @('테스트방', 247, 318), @('1', 325, 331)) 321 344
+        Test-Single ($oneResult + @($row2Same)) | Should Be $false
+    }
+
+    It 'stays strict for lines that carry no word boxes: the whole line text must be the name, so a stray icon character fails' {
+        Test-Single @((New-Line '0 테스트방 1' 220 214 238)) | Should Be $false
+        Test-Single @((New-Line '테스트방 1' 220 214 238)) | Should Be $true
+    }
+}
+
+# 배율이 다른 모니터: 같은 카카오톡 창이 배율 150% 에서는 588x753, 100% 에서는 392x502 로 보인다(588 / 1.5 = 392).
+# 줄의 픽셀 값에 배율 비율을 곱해 다른 배율에서 읽힌 것처럼 만든다.
+function Convert-LinesScale($Lines, [double]$Factor) {
+    @(foreach ($l in $Lines) {
+        $o = [pscustomobject]@{ Text = $l.Text; Left = $l.Left * $Factor; Right = $l.Right * $Factor; Top = $l.Top * $Factor; Bottom = $l.Bottom * $Factor }
+        if ($l.PSObject.Properties['Words'] -and $null -ne $l.Words) {
+            $o | Add-Member -NotePropertyName Words -NotePropertyValue @($l.Words | ForEach-Object { [pscustomobject]@{ Text = $_.Text; Left = $_.Left * $Factor; Right = $_.Right * $Factor } })
+        }
+        $o
+    })
+}
+
+Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)' {
+    It 'judges the same real screen at 100%, 125%, 150% and 200% window scale' {
+        foreach ($s in 1.0, 1.25, 1.5, 2.0) {
+            $factor = $s / 1.5
+            $lines = Convert-LinesScale $oneResult $factor
+            Test-Single $lines '테스트방' $ClickY ([Math]::Round(588 * $factor)) ([Math]::Round(753 * $factor)) $s | Should Be $true
+        }
+    }
+
+    It 'refuses the same lines when the stated scale does not match the window size' {
+        $lines100 = Convert-LinesScale $oneResult (1.0 / 1.5)
+        Test-Single $lines100 '테스트방' $ClickY 392 502 1.0 | Should Be $true
+        Test-Single $lines100 '테스트방' $ClickY 392 502 1.5 | Should Be $false
+        Test-Single $oneResult '테스트방' $ClickY 588 753 1.5 | Should Be $true
+        Test-Single $oneResult '테스트방' $ClickY 588 753 1.0 | Should Be $false
+    }
+
+    It 'scales the name-start tolerance too: at 100% the name must start within 2 pixels of 164.7 and the icon gap is at most 5.3' {
+        $time100 = Convert-LinesScale @($realTime, $realPrev1) (1.0 / 1.5)
+        foreach ($start in 163, 165, 166) {
+            $title = New-WordLine @(@('0', 146, 161), @('테스트방', $start, ($start + 47)), @('1', ($start + 52), ($start + 56))) 144 159
+            Test-Single (@($title) + $time100) '테스트방' $ClickY 392 502 1.0 | Should Be $true
+        }
+        foreach ($start in 162, 167, 170, 180) {
+            $title = New-WordLine @(@('0', 146, 161), @('테스트방', $start, ($start + 47)), @('1', ($start + 52), ($start + 56))) 144 159
+            Test-Single (@($title) + $time100) '테스트방' $ClickY 392 502 1.0 | Should Be $false
+        }
+    }
+
+    It 'Test-SearchResultSingle uses the scale the capture reports, and a capture that does not report one is judged as 100%' {
+        $one150 = $oneResult
+        $one100 = Convert-LinesScale $oneResult (1.0 / 1.5)
+        $capture100 = { param($h) [pscustomobject]@{ Lines = $one100; Width = 392; Height = 502; Scale = 1.0 } }.GetNewClosure()
+        $capture150 = { param($h) [pscustomobject]@{ Lines = $one150; Width = 588; Height = 753; Scale = 1.5 } }.GetNewClosure()
+        $capture150NoScale = { param($h) [pscustomobject]@{ Lines = $one150; Width = 588; Height = 753 } }.GetNewClosure()
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture100 | Should Be $true
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture150 | Should Be $true
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture150NoScale | Should Be $false
+    }
+
+    It 'Get-KitWindowScale never throws and answers 1.0 when the window scale is unknown' {
+        $e = Get-ThrownError { [void](Get-KitWindowScale -Hwnd 0) }
+        $e | Should BeNullOrEmpty
+        (Get-KitWindowScale -Hwnd 0) | Should Be 1
     }
 }
 
@@ -129,7 +322,7 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotLines = @($searchBox, $row1Name, $row1Prev1)
         $shotW = $W
         $shotH = $H
-        $capture = { param($h) [void]$seen.Add($h); [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH } }.GetNewClosure()
+        $capture = { param($h) [void]$seen.Add($h); [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 4242 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture | Should Be $true
         $seen.Count | Should Be 1
         $seen[0] | Should Be 4242
@@ -141,8 +334,8 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotH = $H
         $two = @($row1Name, $row2Name)
         $one = @($row1Name)
-        $captureTwo = { param($h) [pscustomobject]@{ Lines = $two; Width = $shotW; Height = $shotH } }.GetNewClosure()
-        $captureOne = { param($h) [pscustomobject]@{ Lines = $one; Width = $shotW; Height = $shotH } }.GetNewClosure()
+        $captureTwo = { param($h) [pscustomobject]@{ Lines = $two; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
+        $captureOne = { param($h) [pscustomobject]@{ Lines = $one; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.30 -Capture $captureOne | Should Be $true
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.30 -Capture $captureTwo | Should Be $false
     }
@@ -151,7 +344,7 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotLines = @($searchBox, $row1Name, $row1Prev1)
         $shotW = $W
         $shotH = $H
-        $capture = { param($h) [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Covered = $true } }.GetNewClosure()
+        $capture = { param($h) [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Scale = 1.5; Covered = $true } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture | Should Be $false
     }
 }
@@ -182,6 +375,32 @@ Describe 'Ocr: 화면 글자 읽기 엔진' {
         $lines.Count | Should BeGreaterThan 0
         (($lines | ForEach-Object { $_.Text }) -join ' ') -replace '\s', '' | Should Match '테스트방'
         $lines[0].Bottom | Should BeGreaterThan $lines[0].Top
+    }
+
+    It 'returns the word boxes of every line, each inside its line (passes trivially without the Korean reader)' {
+        if (-not (Test-OcrAvailable)) { return }
+        Add-Type -AssemblyName System.Drawing
+        $bmp = New-Object System.Drawing.Bitmap 520, 140
+        try {
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            try {
+                $g.Clear([System.Drawing.Color]::White)
+                $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+                $font = New-Object System.Drawing.Font 'Malgun Gothic', 36, ([System.Drawing.FontStyle]::Bold)
+                $g.DrawString('테스트방 1', $font, [System.Drawing.Brushes]::Black, 20, 30)
+            }
+            finally { $g.Dispose() }
+            $lines = @(Get-OcrLines -Bitmap $bmp)
+        }
+        finally { $bmp.Dispose() }
+        $lines.Count | Should BeGreaterThan 0
+        @($lines[0].Words).Count | Should BeGreaterThan 0
+        foreach ($word in @($lines[0].Words)) {
+            $word.Text.Length | Should BeGreaterThan 0
+            $word.Right | Should BeGreaterThan $word.Left
+            $word.Left | Should BeGreaterThan ($lines[0].Left - 0.5)
+            $word.Right | Should BeLessThan ($lines[0].Right + 0.5)
+        }
     }
 }
 

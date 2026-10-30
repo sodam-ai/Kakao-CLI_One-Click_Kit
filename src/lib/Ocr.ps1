@@ -3,17 +3,29 @@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 
-# 검색 결과 영역과 첫 줄의 위치(창 크기에 대한 비율). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭의 캡처에서 잡은 값이다(가설).
-# 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 방 이름 줄은 왼쪽에서 0.37 쯤에서 시작한다.
-# 창의 가로/세로 비율(588/753 = 0.78)이 AspectMin~AspectMax 를 벗어나면 이 비율들이 맞지 않으므로 판정하지 않는다(거짓). 다른 조건에서는 다시 측정해야 한다.
+# 검색 결과 영역과 첫 줄의 위치(창 크기에 대한 비율). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서 실제 화면 2장(결과 1줄, 여러 줄)을 읽어 확인한 값이다.
+# 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 행 간격은 약 0.139 다.
+# 가로: 왼쪽 메뉴(알림·설정 아이콘이 글자 0 으로 읽힘)는 0~0.17, 목록은 0.17 부터다. ListLeftMin 보다 왼쪽 글자는 결과가 아니다.
+# 방 이름 줄은 왼쪽에서 0.372 의 배지 아이콘(글자 한 개 0 으로 읽힘)으로 시작하고 이름 단어는 0.42(픽셀 247)에서 시작한다. 이름 앞부분이 안 읽히면 이름 단어가 0.46 에서 시작하므로 그것으로 알아챈다.
+# 이름은 창 왼쪽 가장자리에서 일정한 픽셀(NameStartPx)에 있으므로 창 폭의 비율이 아니라 픽셀로 잰다(허용 오차 NameStartTolPx). 이름 시작 위치는 아이콘이 읽혔든 안 읽혔든 같은 좁은 범위여야 한다.
+# 아이콘 단어가 있으면 이름 단어는 아이콘 바로 뒤(IconGapMaxPx, 실측 약 5)에서 시작해야 한다.
+# 픽셀 값(NameStartPx 등)과 창 크기(RefWidth x RefHeight)는 모니터 배율 RefScale(150%)에서 잰 값이다. 같은 창이 배율 100%에서는 392x502, 150%에서는 588x753 으로 보이므로
+# (배율만 다르고 창은 같다) 판정할 때 창이 놓인 모니터의 배율(Scale)을 RefScale 로 나눈 비율을 모든 픽셀 값에 곱한다. 그렇게 맞춘 창 크기에서
+# SizeTolerance 이상 벗어나면 판정하지 않는다(거짓). 150% 에서만 실제 화면으로 확인했다. 다른 배율(100% 등)과 다른 창 크기·탭에서는 실제 화면으로 다시 확인해야 한다.
 $script:ResultBand = @{
     RegionTop      = 0.25
     RegionBottom   = 0.79
     FirstRowBottom = 0.40
+    ListLeftMin    = 0.18
     TitleLeftMin   = 0.30
     TitleLeftMax   = 0.50
-    AspectMin      = 0.70
-    AspectMax      = 0.86
+    NameStartPx    = 247
+    NameStartTolPx = 3
+    IconGapMaxPx   = 8
+    RefScale       = 1.5
+    RefWidth       = 588
+    RefHeight      = 753
+    SizeTolerance  = 0.015
 }
 
 # 한국어 글자 읽기 엔진. 없으면 $null (이 PC 에 한국어 OCR 이 없는 경우).
@@ -40,7 +52,7 @@ function Wait-WinRtOperation {
     return $task.Result
 }
 
-# 비트맵의 글자를 줄 단위로 읽는다. 각 줄: Text, Left, Top, Right, Bottom(픽셀, 비트맵 왼쪽 위가 기준).
+# 비트맵의 글자를 줄 단위로 읽는다. 각 줄: Text, Left, Top, Right, Bottom(픽셀, 비트맵 왼쪽 위가 기준)과 Words(단어마다 Text, Left, Right).
 function Get-OcrLines {
     param([Parameter(Mandatory)][System.Drawing.Bitmap]$Bitmap)
     $ErrorActionPreference = 'Stop'
@@ -63,14 +75,16 @@ function Get-OcrLines {
         $lines = @()
         foreach ($line in $result.Lines) {
             $left = [double]::MaxValue; $top = [double]::MaxValue; $right = 0.0; $bottom = 0.0
+            $words = @()
             foreach ($word in $line.Words) {
                 $box = $word.BoundingRect
                 if ($box.X -lt $left) { $left = $box.X }
                 if ($box.Y -lt $top) { $top = $box.Y }
                 if (($box.X + $box.Width) -gt $right) { $right = $box.X + $box.Width }
                 if (($box.Y + $box.Height) -gt $bottom) { $bottom = $box.Y + $box.Height }
+                $words += [pscustomobject]@{ Text = [string]$word.Text; Left = [double]$box.X; Right = [double]($box.X + $box.Width) }
             }
-            $lines += [pscustomobject]@{ Text = [string]$line.Text; Left = $left; Top = $top; Right = $right; Bottom = $bottom }
+            $lines += [pscustomobject]@{ Text = [string]$line.Text; Left = $left; Top = $top; Right = $right; Bottom = $bottom; Words = $words }
         }
         return $lines
     }
@@ -98,7 +112,7 @@ function Test-MainWindowUncovered {
     return $true
 }
 
-# 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Width·Height(캡처 크기 픽셀), Covered(가려져 있으면 참).
+# 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Width·Height(캡처 크기 픽셀), Scale(창이 놓인 모니터의 배율), Covered(가려져 있으면 참).
 # 판정 영역이 가려져 있으면 읽지 않고 Covered 를 참으로 돌려준다(그러면 아래 판정은 거짓이 되어 방을 열지 않는다).
 function Get-SearchResultLines {
     param([Parameter(Mandatory)][long]$Hwnd)
@@ -110,8 +124,9 @@ function Get-SearchResultLines {
     $width = $rect.Right - $rect.Left
     $height = $rect.Bottom - $rect.Top
     if ($width -le 0 -or $height -le 0) { throw (New-KitError -Key 'room.mainNotFound' -ExitCode 3) }
+    $scale = Get-KitWindowScale -Hwnd $Hwnd
     if (-not (Test-MainWindowUncovered -Hwnd $Hwnd -Rect $rect)) {
-        return [pscustomobject]@{ Lines = @(); Width = $width; Height = $height; Covered = $true }
+        return [pscustomobject]@{ Lines = @(); Width = $width; Height = $height; Scale = $scale; Covered = $true }
     }
     $bitmap = New-Object System.Drawing.Bitmap $width, $height
     try {
@@ -121,7 +136,7 @@ function Get-SearchResultLines {
         $lines = Get-OcrLines -Bitmap $bitmap
     }
     finally { $bitmap.Dispose() }
-    return [pscustomobject]@{ Lines = $lines; Width = $width; Height = $height; Covered = $false }
+    return [pscustomobject]@{ Lines = $lines; Width = $width; Height = $height; Scale = $scale; Covered = $false }
 }
 
 # 읽은 제목 줄이 "기대한 방 이름 + (공백 뒤 최대 5자리 참여자 수) + (기호)"로만 이루어졌는지 본다.
@@ -135,23 +150,59 @@ function Test-RoomTitleText {
     return [regex]::IsMatch($Text.Trim(), $pattern)
 }
 
+# 제목 줄의 단어 상자로 제목 글자를 만든다. 만들 수 없으면 $null(그러면 판정은 거짓이다).
+#  - 이름 시작 위치(NameStartPx - NameStartTolPx) 앞에 있는 단어는 배지 아이콘 칸이다. 글자 한 개짜리 단어 하나만 버린다(아이콘이 0·o 같은 글자로 읽힌다).
+#    글자 내용으로 허용하는 것이 아니라 위치로 구분한다: 이름 안의 0 은 이름 시작 위치에 있다.
+#  - 남은 첫 단어는 이름 시작 위치(NameStartPx ± NameStartTolPx 픽셀) 안에서 시작해야 한다(아이콘이 읽혔든 아니든 같다). 아니면 이름 앞부분이 안 읽힌 것(다른 방일 수 있다)이거나 다른 줄이다.
+function Get-TitleTextFromWords {
+    # Factor: 현재 배율 / 측정 배율(RefScale). 측정한 픽셀 값에 곱해 현재 화면의 픽셀로 바꾼다.
+    param([object[]]$Words = @(), [double]$ImageWidth, [double]$Factor = 1.0)
+    $sorted = @($Words | Where-Object { $null -ne $_ } | Sort-Object -Property Left)
+    if ($sorted.Count -eq 0 -or $ImageWidth -le 0 -or $Factor -le 0) { return $null }
+    $nameMin = ($script:ResultBand.NameStartPx - $script:ResultBand.NameStartTolPx) * $Factor
+    $nameMax = ($script:ResultBand.NameStartPx + $script:ResultBand.NameStartTolPx) * $Factor
+    $iconGapMax = $script:ResultBand.IconGapMaxPx * $Factor
+    $nameWords = $sorted
+    $iconRight = $null
+    if ([double]$sorted[0].Left -lt $nameMin) {
+        if (([string]$sorted[0].Text).Length -ne 1) { return $null }
+        if ($sorted.Count -lt 2) { return $null }
+        $iconRight = [double]$sorted[0].Right
+        $nameWords = @($sorted[1..($sorted.Count - 1)])
+    }
+    $start = [double]$nameWords[0].Left
+    if ($start -lt $nameMin -or $start -gt $nameMax) { return $null }
+    # 아이콘이 있으면 이름은 그 바로 뒤에서 시작한다. 사이에 읽히지 않은 글자가 있으면 이름 앞부분이 빠진 것이다.
+    if ($null -ne $iconRight -and ($start - $iconRight) -gt $iconGapMax) { return $null }
+    return (($nameWords | ForEach-Object { [string]$_.Text }) -join ' ')
+}
+
 # 읽은 줄들이 "기대한 방 하나뿐인 검색 결과"인지 판정한다(화면 없이 시험할 수 있는 순수 함수). 확인하지 못하면 항상 거짓이다.
 # 참(true)이 되려면 모두 맞아야 한다:
-#  ① 창 모양(가로/세로)이 측정한 모양과 비슷하다 ② 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓)
+#  ① 창 크기가 측정한 크기(150% 에서 588x753)를 현재 배율(Scale)로 맞춘 크기에서 1.5% 안이다(100% 라면 392x502) ② 목록 칸(왼쪽 메뉴 제외)의 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓)
 #  ③ 더블클릭할 높이(ClickRelY)가 첫 줄 안(이름 줄 맨 위 ~ 첫 줄 아래 끝)에 있다 ④ 방 이름 칸(왼쪽에서 0.30~0.50)에서 맨 위에 있는 줄 하나가
 #    방 이름 모양이다. 미리보기·시각 줄은 보지 않는다: 다른 방의 미리보기가 우연히 방 이름과 같아도 통과하지 못한다.
+#  ⑤ 줄에 단어 상자(Words)가 있으면 제목은 단어 위치로 만든다(Get-TitleTextFromWords). 단어 상자가 없는 줄은 줄 전체 글자가 이름이어야 한다.
 function Test-SingleResultLines {
-    param([object[]]$Lines = @(), [string]$ExpectedName, [double]$ImageWidth, [double]$ImageHeight, [double]$ClickRelY)
-    if ([string]::IsNullOrWhiteSpace($ExpectedName) -or $ImageWidth -le 0 -or $ImageHeight -le 0) { return $false }
+    # Scale: 창이 놓인 모니터의 배율(1.0 = 100%). 모르면 1.0 으로 보며, 그러면 크기가 맞지 않아 거짓이 된다.
+    param([object[]]$Lines = @(), [string]$ExpectedName, [double]$ImageWidth, [double]$ImageHeight, [double]$ClickRelY, [double]$Scale = 1.0)
+    if ([string]::IsNullOrWhiteSpace($ExpectedName) -or $ImageWidth -le 0 -or $ImageHeight -le 0 -or $Scale -le 0) { return $false }
     if ($ClickRelY -le 0 -or $ClickRelY -ge 1) { return $false }
-    $aspect = $ImageWidth / $ImageHeight
-    if ($aspect -lt $script:ResultBand.AspectMin -or $aspect -gt $script:ResultBand.AspectMax) { return $false }
+    $factor = $Scale / $script:ResultBand.RefScale
+    $refWidth = $script:ResultBand.RefWidth * $factor
+    $refHeight = $script:ResultBand.RefHeight * $factor
+    if ([Math]::Abs($ImageWidth - $refWidth) / $refWidth -gt $script:ResultBand.SizeTolerance) { return $false }
+    if ([Math]::Abs($ImageHeight - $refHeight) / $refHeight -gt $script:ResultBand.SizeTolerance) { return $false }
     $region = @()
     foreach ($line in @($Lines)) {
         if ($null -eq $line) { continue }
+        # 왼쪽 메뉴 칸의 글자는 결과가 아니다(메뉴 아이콘이 글자로 읽히기도 한다).
+        if (([double]$line.Left / $ImageWidth) -lt $script:ResultBand.ListLeftMin) { continue }
         $center = (([double]$line.Top + [double]$line.Bottom) / 2) / $ImageHeight
         if ($center -ge $script:ResultBand.RegionTop -and $center -le $script:ResultBand.RegionBottom) {
+            $wordsProp = $line.PSObject.Properties['Words']
             $region += [pscustomobject]@{
+                Words  = $(if ($wordsProp) { $wordsProp.Value } else { $null })
                 Text   = [string]$line.Text
                 Left   = [double]$line.Left / $ImageWidth
                 Top    = [double]$line.Top / $ImageHeight
@@ -168,7 +219,12 @@ function Test-SingleResultLines {
     $column = @($region | Where-Object { $_.Left -ge $script:ResultBand.TitleLeftMin -and $_.Left -le $script:ResultBand.TitleLeftMax })
     if ($column.Count -eq 0) { return $false }
     $title = $column | Sort-Object -Property Top, Left | Select-Object -First 1
-    return (Test-RoomTitleText -Text $title.Text -ExpectedName $ExpectedName)
+    $titleText = $title.Text
+    if ($null -ne $title.Words) {
+        $titleText = Get-TitleTextFromWords -Words $title.Words -ImageWidth $ImageWidth -Factor $factor
+        if ($null -eq $titleText) { return $false }
+    }
+    return (Test-RoomTitleText -Text $titleText -ExpectedName $ExpectedName)
 }
 
 # 메인 창의 검색 결과가 방 이름 하나뿐인지 확인한다. ClickRelY 는 이어서 더블클릭할 높이다(확인한 줄과 클릭하는 줄이 같은 위치여야 한다).
@@ -178,5 +234,9 @@ function Test-SearchResultSingle {
     if (-not $Capture) { $Capture = { param($h) Get-SearchResultLines -Hwnd $h } }
     $shot = & $Capture $Hwnd
     if ($null -eq $shot -or $shot.Covered) { return $false }
-    return (Test-SingleResultLines -Lines $shot.Lines -ExpectedName $ExpectedName -ImageWidth $shot.Width -ImageHeight $shot.Height -ClickRelY $ClickRelY)
+    # 캡처가 배율을 알려 주지 않으면 1.0 으로 본다(안전: 150% 크기의 캡처는 크기가 맞지 않아 거짓이 된다).
+    $scale = 1.0
+    $scaleProp = $shot.PSObject.Properties['Scale']
+    if ($scaleProp -and $null -ne $scaleProp.Value) { $scale = [double]$scaleProp.Value }
+    return (Test-SingleResultLines -Lines $shot.Lines -ExpectedName $ExpectedName -ImageWidth $shot.Width -ImageHeight $shot.Height -ClickRelY $ClickRelY -Scale $scale)
 }
