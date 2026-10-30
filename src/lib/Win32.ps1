@@ -40,6 +40,7 @@ public static class KakaoWin32 {
     [DllImport("user32.dll")] static extern bool PostMessageW(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr h);
 
     // 입력 결과 코드: 0 성공, 1 카카오톡 창 아님, 2 제목 다름, 3 맨 앞 아님, 4 사람 손 감지(또는 기준 없음), 5 다른 키 눌림,
     // 6 허용되지 않은 키 조합, 7 클릭 자리가 다른 창에 가림, 8 마우스 위치가 바뀜, 9 입력 전달 실패, 10 잘못된 인자
@@ -80,6 +81,10 @@ public static class KakaoWin32 {
         return new int[] { r.Left, r.Top, r.Right, r.Bottom };
     }
     public static long Foreground() { return GetForegroundWindow().ToInt64(); }
+    // 창이 놓인 모니터의 DPI(96 = 배율 100%, 144 = 150%). 모르면 96. 읽기만 한다.
+    public static int Dpi(long h) {
+        try { uint d = GetDpiForWindow(new IntPtr(h)); return d == 0 ? 96 : (int)d; } catch (EntryPointNotFoundException) { return 96; }
+    }
     public static long Root(long h) {
         if (h == 0) return 0;
         return GetAncestor(new IntPtr(h), 2).ToInt64();
@@ -221,6 +226,12 @@ function Get-DefaultInputProvider {
 
 # 창 좌표를 실제 화면 픽셀로 읽어야 하는 곳(화면 캡처, Ocr.ps1)이 DPI 설정을 켤 때 쓴다. [KakaoWin32]:: 호출은 이 파일에만 둔다.
 function Enable-KitDpiAwareness { [KakaoWin32]::EnableDpiAwareness() }
+
+# 창이 놓인 모니터의 배율(1.0 = 100%, 1.5 = 150%). 알 수 없으면 1.0. DPI 설정을 켠 뒤에 불러야 실제 값이 나온다.
+function Get-KitWindowScale {
+    param([long]$Hwnd)
+    return ([KakaoWin32]::Dpi($Hwnd) / 96.0)
+}
 
 # 카카오톡 프로세스가 가진 보이는 최상위 창(저장 대화상자 같은 모달 창 포함). 읽기 전용.
 function Get-KakaoWindows {

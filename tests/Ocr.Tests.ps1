@@ -17,8 +17,8 @@ $row3Prev = New-Line '아래쪽 어딘가의 글자' 220 400 420            # �
 $ad = New-Line '광고 문구' 60 636 660                              # 광고 영역(중심 0.86): 결과 영역 밖
 
 # 판정 함수를 짧게 부르는 도우미(기본값은 위의 실제 배치).
-function Test-Single($lines, [string]$name = '테스트방', [double]$clickY = $ClickY, [double]$width = $W, [double]$height = $H) {
-    return (Test-SingleResultLines -Lines $lines -ExpectedName $name -ImageWidth $width -ImageHeight $height -ClickRelY $clickY)
+function Test-Single($lines, [string]$name = '테스트방', [double]$clickY = $ClickY, [double]$width = $W, [double]$height = $H, [double]$scale = 1.5) {
+    return (Test-SingleResultLines -Lines $lines -ExpectedName $name -ImageWidth $width -ImageHeight $height -ClickRelY $clickY -Scale $scale)
 }
 
 Describe 'Ocr: Test-SingleResultLines (정확히 1건인가, 화면 없이 판정)' {
@@ -236,6 +236,65 @@ Describe 'Ocr: 실제 화면에서 본 배치(글자 상자 위치로 판정)' {
     }
 }
 
+# 배율이 다른 모니터: 같은 카카오톡 창이 배율 150% 에서는 588x753, 100% 에서는 392x502 로 보인다(588 / 1.5 = 392).
+# 줄의 픽셀 값에 배율 비율을 곱해 다른 배율에서 읽힌 것처럼 만든다.
+function Convert-LinesScale($Lines, [double]$Factor) {
+    @(foreach ($l in $Lines) {
+        $o = [pscustomobject]@{ Text = $l.Text; Left = $l.Left * $Factor; Right = $l.Right * $Factor; Top = $l.Top * $Factor; Bottom = $l.Bottom * $Factor }
+        if ($l.PSObject.Properties['Words'] -and $null -ne $l.Words) {
+            $o | Add-Member -NotePropertyName Words -NotePropertyValue @($l.Words | ForEach-Object { [pscustomobject]@{ Text = $_.Text; Left = $_.Left * $Factor; Right = $_.Right * $Factor } })
+        }
+        $o
+    })
+}
+
+Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)' {
+    It 'judges the same real screen at 100%, 125%, 150% and 200% window scale' {
+        foreach ($s in 1.0, 1.25, 1.5, 2.0) {
+            $factor = $s / 1.5
+            $lines = Convert-LinesScale $oneResult $factor
+            Test-Single $lines '테스트방' $ClickY ([Math]::Round(588 * $factor)) ([Math]::Round(753 * $factor)) $s | Should Be $true
+        }
+    }
+
+    It 'refuses the same lines when the stated scale does not match the window size' {
+        $lines100 = Convert-LinesScale $oneResult (1.0 / 1.5)
+        Test-Single $lines100 '테스트방' $ClickY 392 502 1.0 | Should Be $true
+        Test-Single $lines100 '테스트방' $ClickY 392 502 1.5 | Should Be $false
+        Test-Single $oneResult '테스트방' $ClickY 588 753 1.5 | Should Be $true
+        Test-Single $oneResult '테스트방' $ClickY 588 753 1.0 | Should Be $false
+    }
+
+    It 'scales the name-start tolerance too: at 100% the name must start within 2 pixels of 164.7 and the icon gap is at most 5.3' {
+        $time100 = Convert-LinesScale @($realTime, $realPrev1) (1.0 / 1.5)
+        foreach ($start in 163, 165, 166) {
+            $title = New-WordLine @(@('0', 146, 161), @('테스트방', $start, ($start + 47)), @('1', ($start + 52), ($start + 56))) 144 159
+            Test-Single (@($title) + $time100) '테스트방' $ClickY 392 502 1.0 | Should Be $true
+        }
+        foreach ($start in 162, 167, 170, 180) {
+            $title = New-WordLine @(@('0', 146, 161), @('테스트방', $start, ($start + 47)), @('1', ($start + 52), ($start + 56))) 144 159
+            Test-Single (@($title) + $time100) '테스트방' $ClickY 392 502 1.0 | Should Be $false
+        }
+    }
+
+    It 'Test-SearchResultSingle uses the scale the capture reports, and a capture that does not report one is judged as 100%' {
+        $one150 = $oneResult
+        $one100 = Convert-LinesScale $oneResult (1.0 / 1.5)
+        $capture100 = { param($h) [pscustomobject]@{ Lines = $one100; Width = 392; Height = 502; Scale = 1.0 } }.GetNewClosure()
+        $capture150 = { param($h) [pscustomobject]@{ Lines = $one150; Width = 588; Height = 753; Scale = 1.5 } }.GetNewClosure()
+        $capture150NoScale = { param($h) [pscustomobject]@{ Lines = $one150; Width = 588; Height = 753 } }.GetNewClosure()
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture100 | Should Be $true
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture150 | Should Be $true
+        Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture150NoScale | Should Be $false
+    }
+
+    It 'Get-KitWindowScale never throws and answers 1.0 when the window scale is unknown' {
+        $e = Get-ThrownError { [void](Get-KitWindowScale -Hwnd 0) }
+        $e | Should BeNullOrEmpty
+        (Get-KitWindowScale -Hwnd 0) | Should Be 1
+    }
+}
+
 Describe 'Ocr: Test-MainWindowUncovered (판정 영역이 가려지지 않았는가)' {
     $rect = [pscustomobject]@{ Left = 100; Top = 200; Right = 688; Bottom = 953 }
     function New-OwnerProvider($owner) { return @{ RootAtPoint = { param($x, $y) $owner }.GetNewClosure() } }
@@ -263,7 +322,7 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotLines = @($searchBox, $row1Name, $row1Prev1)
         $shotW = $W
         $shotH = $H
-        $capture = { param($h) [void]$seen.Add($h); [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH } }.GetNewClosure()
+        $capture = { param($h) [void]$seen.Add($h); [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 4242 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture | Should Be $true
         $seen.Count | Should Be 1
         $seen[0] | Should Be 4242
@@ -275,8 +334,8 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotH = $H
         $two = @($row1Name, $row2Name)
         $one = @($row1Name)
-        $captureTwo = { param($h) [pscustomobject]@{ Lines = $two; Width = $shotW; Height = $shotH } }.GetNewClosure()
-        $captureOne = { param($h) [pscustomobject]@{ Lines = $one; Width = $shotW; Height = $shotH } }.GetNewClosure()
+        $captureTwo = { param($h) [pscustomobject]@{ Lines = $two; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
+        $captureOne = { param($h) [pscustomobject]@{ Lines = $one; Width = $shotW; Height = $shotH; Scale = 1.5 } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.30 -Capture $captureOne | Should Be $true
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.30 -Capture $captureTwo | Should Be $false
     }
@@ -285,7 +344,7 @@ Describe 'Ocr: Test-SearchResultSingle (캡처 -> 판정 연결)' {
         $shotLines = @($searchBox, $row1Name, $row1Prev1)
         $shotW = $W
         $shotH = $H
-        $capture = { param($h) [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Covered = $true } }.GetNewClosure()
+        $capture = { param($h) [pscustomobject]@{ Lines = $shotLines; Width = $shotW; Height = $shotH; Scale = 1.5; Covered = $true } }.GetNewClosure()
         Test-SearchResultSingle -Hwnd 1 -ExpectedName '테스트방' -ClickRelY 0.335 -Capture $capture | Should Be $false
     }
 }
