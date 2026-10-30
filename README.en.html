@@ -40,11 +40,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h1>KakaoTalk Kit (Kakao-CLI One-Click Kit)</h1>
 <p><a href="README.html">한국어</a> · <a href="README.en.html">English</a></p>
 <blockquote>
-<p><strong>Current status: under development (6 of 13 steps done).</strong></p>
-<p>The only command you can really use right now is <strong><code>kakao version</code></strong>. Sending messages, reading chats, searching, saving and the numbered menu are <strong>not built yet.</strong> This document keeps "works now (✅)" and "planned (⏳)" apart from the first line to the last.</p>
+<p><strong>Current status: under development (6 of 13 steps done, step 7 in progress).</strong></p>
+<p>The only command you can really use right now is <strong><code>kakao version</code></strong>. Sending messages, reading chats, searching, saving and the numbered menu are <strong>not built yet.</strong> The part that opens a chat room (step 7) is built and tested but is not connected to a command yet. This document keeps "works now (✅)" and "planned (⏳)" apart from the first line to the last.</p>
 <p>This is an <strong>unofficial tool</strong>. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read <a href="#legal">Chapter 17, Legal, copyright and license</a> before using it.</p>
 </blockquote>
-<p>Document date: 2026-10-29 · Basis: steps 1-6 done + two verification rounds + repository cleanup (M0) + minimal version check (M7-0) + gatekeeper Hangul-key exception · License: Apache License 2.0 · Written so that people who are new to computers can follow it.</p>
+<p>Document date: 2026-10-31 · Basis: steps 1-6 done + step 7 chat-room opening and on-screen text reading parts + mid-way verification · 262 automated tests · License: Apache License 2.0 · Written so that people who are new to computers can follow it.</p>
 <ul>
 <li>✅ = works right now. ⏳ = does not work yet (planned).
 </li>
@@ -52,6 +52,17 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>Unfamiliar words are explained in <a href="#glossary">Chapter 19, Glossary</a>.
 </li></ul>
+<p><strong>At a glance</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>What you may wonder</th><th>Answer</th></tr></thead>
+<tbody>
+<tr><td>Commands you can use now</td><td>Only <code>kakao version</code>.</td></tr>
+<tr><td>Sending messages, reading chats</td><td>Not yet. Reading is built first, sending after it (Chapter 2).</td></tr>
+<tr><td>Setup and preparation</td><td>Copy the folder and you are done. No installer, no sign-up, no administrator rights and no internet are needed (Chapters 3-4).</td></tr>
+<tr><td>Who uses it</td><td>As the owner decided, it is used <strong>for personal use only</strong>. It is tested only with your own account, on your own computer, in a room where you are alone, and it is not published, distributed or sold (Chapter 17).</td></tr>
+<tr><td>The biggest risk</td><td>Kakao's operating policy may forbid automating the screen, so the chance that your account use is restricted cannot be ruled out (Chapter 17).</td></tr>
+<tr><td>License</td><td>Apache License 2.0 (copyright holder SoDam AI Studio). The repository is private.</td></tr>
+</tbody></table></div>
 <a id="toc"></a>
 <h2>Table of contents</h2>
 <ul>
@@ -140,7 +151,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody></table></div>
 <a id="status"></a>
 <h2>2. Current status: what works and what does not yet</h2>
-<p>Development is split into 13 steps, and steps 1-6 are finished. In the table, "parts done" means <strong>the parts (functions) for that feature are built and pass the automated tests, but they are not yet connected to a command that a user can call.</strong></p>
+<p>Development is split into 13 steps; steps 1-6 are finished and the parts of step 7 are built. In the table, "parts done" means <strong>the parts (functions) for that feature are built and pass the automated tests, but they are not yet connected to a command that a user can call.</strong></p>
 <div class="table-wrap"><table>
 <thead><tr><th>Step</th><th>Content</th><th>Status</th></tr></thead>
 <tbody>
@@ -150,14 +161,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td>4</td><td>Key input layer and safety device (the "gatekeeper")</td><td>✅ Parts done (testing real input into KakaoTalk is ⏳)</td></tr>
 <tr><td>5</td><td>Saving and restoring the clipboard</td><td>✅ Parts done</td></tr>
 <tr><td>6</td><td>Reading export files (parser)</td><td>✅ Parts done</td></tr>
-<tr><td>7</td><td>Opening a room</td><td>⏳ Parts done (tested with fake parts); the real-screen test and the connection to a command are not done yet. In the preliminary research, pasting into the search, opening a room, checking the opened window's title and closing it each passed once with the kit's code</td></tr>
-<tr><td>8</td><td>Sending a message</td><td>⏳ Planned</td></tr>
-<tr><td>9</td><td>Export, read, search</td><td>⏳ Planned</td></tr>
+<tr><td>7</td><td>Opening a room</td><td>⏳ Parts done; the connection to a command is not done yet. Checked in real KakaoTalk: judging with on-screen text reading whether the search result is exactly one room name (checked on a real screen and then fixed), and opening and closing a room (on a 100% monitor: double-click the first result → check the new window's title → close only the window the kit opened; passed once). Not done yet: the whole flow starting from clicking the search icon, selecting all in the search box (<code>Ctrl+A</code>), and a 150% monitor</td></tr>
+<tr><td>8</td><td>Sending a message</td><td>⏳ Planned (built after step 9; a separate approval from the user is taken before starting)</td></tr>
+<tr><td>9</td><td>Export, read, search</td><td>⏳ Planned (built before step 8)</td></tr>
 <tr><td>10</td><td>Status check, KakaoTalk version check, login guidance, lock for unverified versions</td><td>⏳ Planned</td></tr>
 <tr><td>11</td><td>Finished command router, numbered menu, <code>help</code></td><td>⏳ Planned</td></tr>
 <tr><td>12</td><td>First-run consent, update, uninstall</td><td>⏳ Planned</td></tr>
 <tr><td>13</td><td>End-to-end acceptance test, final user guide</td><td>⏳ Planned</td></tr>
 </tbody></table></div>
+<p><strong>Change of work order (approved by the user on 2026-10-30):</strong> The plan had reading (step 9) after sending (step 8), but <strong>reading is built first and sending afterwards.</strong> There are three reasons. ① Without reading, you cannot confirm that a sent message really went through, so only "unknown" would ever come out of the three results (confirmed, failed, unknown) that design document 13.7 defines. ② The reading parser is already built and can be tested with synthetic fake chat files. ③ The only key sent to real KakaoTalk so far is <code>Ctrl+V</code>, so if the first <code>Enter</code> is pressed in a file-save window instead of in a message that goes to someone else, a mistake does less harm.</p>
 <h3>Verification environment (the conditions that were actually checked)</h3>
 <div class="table-wrap"><table>
 <thead><tr><th>Item</th><th>Value</th></tr></thead>
@@ -166,13 +178,17 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td>PowerShell</td><td>Windows PowerShell 5.1 (5.1.26100.9711)</td></tr>
 <tr><td>KakaoTalk PC</td><td>26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to <strong>26.9.1.5339</strong>, where only clicking, pasting, opening a room and closing its window have been tested, and sending has not (it is not on the tested-version list)</td></tr>
 <tr><td>Display language</td><td>English (en-US). Even so, every message of the kit is in Korean.</td></tr>
-<tr><td>Monitors</td><td>4 (including negative coordinates on a secondary monitor). Display scaling differs per monitor; the monitor holding KakaoTalk is at 150%</td></tr>
+<tr><td>Monitors</td><td>4 (including negative coordinates on a secondary monitor). Three are at 100% display scaling and the one below is at 150%. The same KakaoTalk window looks like 392x502 at 100% and 588x753 at 150%. The room-opening test was done on the 100% main monitor and not yet at 150%</td></tr>
 <tr><td>Rights</td><td>No administrator rights (normal user)</td></tr>
 <tr><td>Default terminal</td><td>Windows Terminal</td></tr>
 </tbody></table></div>
 <h3>What has not been verified yet (an honest list)</h3>
 <ul>
-<li>Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is <strong>a click, a paste (Ctrl+V), a double-click (opening a room) and a window-close request in the step 7 preliminary research</strong> (no message was sent, and the safety guard did not stop; see chapter 14). Other keys such as Enter and Ctrl+S, and sending messages and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
+<li>Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is <strong>a click, a paste (Ctrl+V), a double-click (opening a room) and a window-close request in the step 7 preliminary research and the room-opening test</strong> (no message was sent. In the tests that passed, the safety guard did not stop; when a person touched the machine or the window size or monitor scaling differed from the reference, it really did stop before any input. See chapter 14). Other keys such as Enter and Ctrl+S, and sending messages and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
+</li>
+<li>Whether selecting all in the search box (<code>Ctrl+A</code>) works in the real KakaoTalk search box: it is in the room-opening part, but it has not been tested for real. The whole room-opening flow starting from clicking the search icon has not been tested in one go either (only the middle steps of opening and closing were tested).
+</li>
+<li>With a display scaling of 125% or 200%: checked only with fake test data (the monitors of this PC are only at 100% and 150%). Really opening a room on the 150% monitor has not been tried yet.
 </li>
 <li>Actually sending Korean text, multi-line text, long messages and emoji
 </li>
@@ -182,7 +198,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>How to tell rooms apart when several rooms have the same name
 </li>
-<li>False alarms of human-hand detection (did the person touch the keyboard or mouse), whether the pressed-key check is too strict, and behaviour with monitors of different display scaling mixed together: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
+<li>False alarms of human-hand detection (did the person touch the keyboard or mouse; stopping although nobody touched anything) and whether the pressed-key check is too strict: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
 </li>
 <li>How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
 </li>
@@ -214,6 +230,8 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td>Windows PowerShell 5.1</td><td>Needed, no installation</td><td>Built into Windows. To check: open PowerShell from the Start menu and type <code>$PSVersionTable.PSVersion</code>; you will see 5.1.x.</td></tr>
 <tr><td>PowerShell 7 (<code>pwsh</code>)</td><td>Not needed</td><td>Not used even if present. The kit uses only the built-in <code>powershell.exe</code>.</td></tr>
 <tr><td>KakaoTalk PC</td><td>Not needed for now</td><td><code>version</code> works without KakaoTalk. Later, sending and similar features will be allowed only on 26.9.0.5337, and other versions are planned to be read-only (⏳).</td></tr>
+<tr><td>Windows Korean on-screen text reading (OCR)</td><td>Needed for opening a room (⏳ after it is connected to a command), not needed for now</td><td>The Korean engine of the on-screen text reading feature built into Windows. It is used to check that the search result is exactly one room name, and without it the kit does not open the room. This PC has it (<code>ko</code> is among the installed text-reading languages). How to install it on a PC that lacks it has not been checked (adding Korean in the Windows language settings is the usual way, but it was not tried on this PC).</td></tr>
+<tr><td>Access to the GitHub repository (web browser or <code>gh</code>)</td><td>Only when downloading</td><td>Needed to download from the private repository (Chapter 4). Not needed if you received the folder by USB or as a compressed file.</td></tr>
 <tr><td>Administrator rights</td><td>Not needed</td><td>The UAC (administrator permission) window does not appear.</td></tr>
 <tr><td>Internet</td><td>Not needed</td><td>The kit's code has no part that connects to the internet (checked by code search). The KakaoTalk app itself does use the internet.</td></tr>
 <tr><td>Pester 3.4.0</td><td>Developers only</td><td>The automated test tool. The copy built into Windows is used; it is not included in or redistributed with the kit.</td></tr>
@@ -362,11 +380,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td><code>kakao help</code></td><td>⏳ Planned</td><td>Shows Korean help with examples.</td><td>11</td></tr>
 <tr><td><code>kakao status</code></td><td>⏳ Planned</td><td>Checks KakaoTalk installation, version, running and login state, number of allowed rooms and recent errors.</td><td>10</td></tr>
 <tr><td><code>kakao rooms</code></td><td>⏳ Planned</td><td>Manages allowed rooms: <code>rooms list</code>, <code>rooms add &lt;name&gt;</code>, <code>rooms remove &lt;name&gt;</code> (only a person can change them)</td><td>11</td></tr>
-<tr><td><code>kakao open &lt;room&gt;</code></td><td>⏳ Planned</td><td>Opens a room from the allowed list through search and checks the window title.</td><td>7</td></tr>
-<tr><td><code>kakao send &lt;room&gt; "&lt;message&gt;"</code></td><td>⏳ Planned</td><td>Sends a message to an allowed room. The default is preview and confirmation.</td><td>8</td></tr>
-<tr><td><code>kakao export &lt;room&gt;</code></td><td>⏳ Planned</td><td>Saves the whole chat to a file with the official export.</td><td>9</td></tr>
-<tr><td><code>kakao read &lt;room&gt;</code></td><td>⏳ Planned</td><td>Exports, then reads the file and shows it.</td><td>9</td></tr>
-<tr><td><code>kakao search "&lt;keyword&gt;"</code></td><td>⏳ Planned</td><td>Searches in chat files that were saved earlier (does not operate KakaoTalk).</td><td>9</td></tr>
+<tr><td><code>kakao open &lt;room&gt;</code></td><td>⏳ Planned</td><td>Opens a room from the allowed list through search and checks the window title. The part is built and tested; only the connection to a command is left.</td><td>7</td></tr>
+<tr><td><code>kakao send &lt;room&gt; "&lt;message&gt;"</code></td><td>⏳ Planned</td><td>Sends a message to an allowed room. The default is preview and confirmation. Built after step 9.</td><td>8</td></tr>
+<tr><td><code>kakao export &lt;room&gt;</code></td><td>⏳ Planned</td><td>Saves the whole chat to a file with the official export. Built before step 8.</td><td>9</td></tr>
+<tr><td><code>kakao read &lt;room&gt;</code></td><td>⏳ Planned</td><td>Exports, then reads the file and shows it. Built before step 8.</td><td>9</td></tr>
+<tr><td><code>kakao search "&lt;keyword&gt;"</code></td><td>⏳ Planned</td><td>Searches in chat files that were saved earlier (does not operate KakaoTalk). Built before step 8.</td><td>9</td></tr>
 <tr><td><code>kakao update</code></td><td>⏳ Planned</td><td>Installs over the old one from a new folder (settings and records kept).</td><td>12</td></tr>
 <tr><td><code>kakao uninstall</code></td><td>⏳ Planned</td><td>Removes only what the kit created. Asks whether to delete exported chats (default: keep).</td><td>12</td></tr>
 <tr><td><code>kakao menu</code></td><td>⏳ Planned</td><td>Opens the numbered menu.</td><td>11</td></tr>
@@ -425,6 +443,23 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>Keeping: per room it keeps 1 latest copy and 3 earlier snapshots, and snapshots older than 30 days are deleted (⏳).
 </li></ol>
+<h3>How opening a room works (⏳ connected to a command in step 7, the parts below are ✅)</h3>
+<ol>
+<li>It first checks that the room is on the allowed list. If it is not, it stops without even reading the window list.
+</li>
+<li>If exactly one room window with the same title is already open, it uses that window (it does not close it, because the kit did not open it); if there are two or more, it cannot tell which is which and stops.
+</li>
+<li>It checks that there is exactly one KakaoTalk main window and that Korean on-screen text reading (OCR) is available. If either is not true, it does not open the room.
+</li>
+<li>It waits until your hands are off the keyboard and mouse, then searches in this order: click the search icon → select all (<code>Ctrl+A</code>) → paste the room name (<code>Ctrl+V</code>). It never clicks a list by eye.
+</li>
+<li>It reads the search-result area with on-screen text reading and checks that it shows exactly one room name. If it cannot confirm that, it does not double-click. It also checks that the KakaoTalk window has the reference size and that the result area is not covered by another window.
+</li>
+<li>It double-clicks the first result row once and waits up to 8 seconds for a new window. It counts as success only when the new window's title is word for word the room name.
+</li>
+<li>If the title differs, it closes that window and stops. It closes only the window the kit opened, and sends a single close request only to a window that belongs to KakaoTalk and whose title matches exactly.
+</li></ol>
+<p>On-screen text reading looks at the screen in memory only (nothing is saved to disk). The size of the KakaoTalk window and the position of its text depend on the display scaling of the monitor the window sits on (the same window is 588x753 at 150% and 392x502 at 100%), so the pixel values used for the decision are recalculated for that scaling. If they do not match the reference, it stops on the side of not opening. Opening a room can show a "read" mark to the other person and cannot be undone, so not opening unless it is sure is this part's basic rule.</p>
 <h3>What the gatekeeper blocks</h3>
 <ul>
 <li>No key other than the 5 allowed keys (<code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code>, <code>Enter</code>) is ever sent.
@@ -456,7 +491,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
   4. check KakaoTalk version ........ ⏳ (exit code 4 if unverified)
   5. preview + confirm (skip with --yes) ⏳
   6. before starting, wait hands off . part ✅ (Wait-UserIdle)
-  7. open the room (search only) .... ⏳ step 7
+  7. open the room (search only) .... part ✅ (Open-KakaoRoom), command link ⏳
   8. gatekeeper check ............... part ✅ (Assert-InputTarget)
   9. check the input box is empty ... ⏳ (stop if text is already written)
  10. save clipboard -&gt; put text ..... part ✅ (Use-TextClipboard)
@@ -467,7 +502,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h3>C. Reading a chat (⏳ design)</h3>
 <pre><code class="language-text">kakao read &lt;room&gt;
   1. check allowed list + AI read permission .. part ✅
-  2. open the room ............................ ⏳ step 7
+  2. open the room ............................ part ✅ (Open-KakaoRoom), command link ⏳
   3. Ctrl+S -&gt; check the save window .......... ⏳ step 9
   4. paste a new file name -&gt; Enter ........... ⏳ step 9
   5. wait until the file exists (max 10 s) .... ⏳ step 9
@@ -483,6 +518,17 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
   -&gt; has no person's input happened since the last input?
   -&gt; run [check + input] together as one action
   If anything is wrong: 0 inputs, a Korean error message, exit code 2</code></pre>
+<h3>E. Opening a room (parts ✅, tested in real KakaoTalk only in part)</h3>
+<pre><code class="language-text">Open-KakaoRoom &lt;room name&gt;
+  1. check the allowed list ............ if it fails, do nothing at all
+  2. is a window with the same title already open? .. one: reuse it (do not close it); two or more: stop
+  3. exactly 1 main window + text reading (OCR) available? .. if not, stop
+  4. wait hands off -&gt; click the search icon -&gt; Ctrl+A -&gt; Ctrl+V
+  5. is the search result exactly 1 row? .. if not, stop without a double-click (and explain why)
+  6. double-click the first result row once
+  7. is the new window's title word for word the room name? (waits up to 8 s)
+       same: success / different: close that window and stop / time is up: stop
+  8. at the end, close only the window the kit opened (never one that was already open)</code></pre>
 <a id="architecture"></a>
 <h2>11. Architecture</h2>
 <h3>Layer diagram</h3>
@@ -493,9 +539,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
                                            |
       +----------+----------+--------------+---+-----------+
       v          v          v                  v           v
-   Config      Log      Guard+Win32          Clip        Parse      (⏳ Room, Send,
-   settings    records  gatekeeper,          clipboard   reading     Export, Search,
-   + allowed            input                            exports     Status, Install, Menu)
+   Config      Log      Guard+Win32          Clip        Parse      Status, Ocr, Room
+   settings    records  gatekeeper,          clipboard   reading     version check,
+   + allowed            input                            exports     text reading, opening rooms  (⏳ not yet: Send, Export, Search, Install, Menu)
       \________ Messages.ko (all Korean messages) · Paths · Errors ________/
                                            |
                   KakaoTalk PC app (windows, keyboard)  /  exported text files</code></pre>
@@ -508,12 +554,12 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td><code>Errors.ps1</code></td><td>Defines the kit's own error types and exit codes (1-4).</td><td>✅</td></tr>
 <tr><td><code>Config.ps1</code></td><td>Handles the settings file, allowed room list, per-room permissions and consent to use.</td><td>✅ Parts</td></tr>
 <tr><td><code>Log.ps1</code></td><td>Makes one-line records without message text, tidies the record file, and builds the error report text.</td><td>✅ Parts</td></tr>
-<tr><td><code>Win32.ps1</code></td><td>Loads Windows features (finding windows, sending key input) through C# code. It is compiled the first time it is loaded and takes about 0.2-0.3 seconds.</td><td>✅ Parts</td></tr>
+<tr><td><code>Win32.ps1</code></td><td>Loads Windows features (finding windows, sending key input, reading the display scaling of the monitor a window is on) through C# code. It is compiled the first time it is loaded and takes about 0.2-0.3 seconds.</td><td>✅ Parts</td></tr>
 <tr><td><code>Guard.ps1</code></td><td>Handles the check right before input (the gatekeeper), the allowed-key table, human-hand detection and the lock against running twice.</td><td>✅ Parts</td></tr>
 <tr><td><code>Clip.ps1</code></td><td>Saves, replaces and restores only the clipboard text, and checks each step.</td><td>✅ Parts</td></tr>
 <tr><td><code>Parse.ps1</code></td><td>Turns an export text file into the room name, saved time and message list.</td><td>✅ Parts</td></tr>
-<tr><td><code>Ocr.ps1</code></td><td>Decides, with on-screen text reading (OCR), whether the search result is only the room name. It reads the screen in memory only, writes nothing to disk and sends no input.</td><td>✅ Parts (real-screen test is ⏳)</td></tr>
-<tr><td><code>Room.ps1</code></td><td>Opens only an allowed room, and only through the search; checks before opening that the result is exactly one row; counts it as success only when the opened window's title equals the room name letter for letter. It does not open when it cannot check.</td><td>✅ Parts (connection to a command is ⏳ step 7)</td></tr>
+<tr><td><code>Ocr.ps1</code></td><td>Decides, with on-screen text reading (OCR), whether the search result is only the room name. It reads the screen in memory only, writes nothing to disk and sends no input.</td><td>✅ Parts (checked on a real screen and fixed, see chapter 14)</td></tr>
+<tr><td><code>Room.ps1</code></td><td>Opens only an allowed room, and only through the search; checks before opening that the result is exactly one row; counts it as success only when the opened window's title equals the room name letter for letter. It does not open when it cannot check.</td><td>✅ Parts (one real open-and-close test passed; connection to a command is ⏳ step 7)</td></tr>
 <tr><td><code>Send.ps1</code></td><td>Sending messages</td><td>⏳ step 8</td></tr>
 <tr><td><code>Export.ps1</code>, <code>Search.ps1</code></td><td>Export, read, search</td><td>⏳ step 9</td></tr>
 <tr><td><code>Status.ps1</code></td><td>Reads the installed KakaoTalk version (cross-checking the registry against the running process) and decides whether it is a version that was actually tested. Read-only. The login check and the full status check are added in step 10.</td><td>✅ Parts (minimal)</td></tr>
@@ -542,6 +588,8 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td>Human-hand detection</td><td>Waits until idle before starting, and stops if human input is detected during the work.</td><td>✅ (checking false alarms is ⏳)</td></tr>
 <tr><td>No running twice at once</td><td>A named lock (<code>Local\KakaoKit.InputLock</code>)</td><td>✅</td></tr>
 <tr><td>Clipboard protection</td><td>Only text is saved and restored, a job stops if there is an image or file, and it is checked after putting text in and after restoring.</td><td>✅</td></tr>
+<tr><td>Does not open unless sure</td><td>Opening a room checks the allowed list, that the search result is exactly one row, and that the window title matches; if any one fails, it does not open. If the opened window is a different one, it closes that window and stops.</td><td>✅ Tested with fake parts (one real open-and-close test passed)</td></tr>
+<tr><td>On-screen text reading is read-only</td><td>It reads the window in memory only, writes nothing to disk and sends no input. The text it reads is used only for the decision and is never logged or printed (because a capture can show other rooms' names).</td><td>✅ Tested</td></tr>
 <tr><td>No message text in the log</td><td>The log function has no parameter at all that takes message text, and each column is cut to 120 characters.</td><td>✅</td></tr>
 <tr><td>Does not handle passwords</td><td>They are neither stored nor typed. The user logs in directly in KakaoTalk.</td><td>✅</td></tr>
 <tr><td>Does not use administrator rights</td><td>There is no code that asks for them, and a test checks this.</td><td>✅</td></tr>
@@ -560,6 +608,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td>Error report</td><td>Kit, KakaoTalk, Windows and PowerShell versions and the last 50 record lines</td><td>Text shown on screen (saving is ⏳)</td><td>No</td><td>It has no chat content, but may contain room names. For a 1:1 room that may be the other person's name, so check before sending it to anyone.</td></tr>
 <tr><td>Message text to send</td><td>Typed by the user</td><td>Memory, the clipboard briefly, and KakaoTalk</td><td>To KakaoTalk (the intended send)</td><td>A mark asking to exclude it from clipboard history and cloud sync is attached. Whether every program obeys it was not checked.</td></tr>
 <tr><td>Original clipboard content</td><td>Text the user had copied</td><td>In memory only</td><td>No</td><td>It is restored after the work. It is not written to disk (checked by code search).</td></tr>
+<tr><td>Screen capture (to check before opening a room)</td><td>The kit reads the KakaoTalk window</td><td>In memory only (not saved)</td><td>No</td><td>A capture can show other rooms' names and previews, so the text it reads is not logged. Captures taken during development for a person to look at were approved one by one, deleted right after checking, and never uploaded to the repository (<code>.gitignore</code> excludes picture files).</td></tr>
 <tr><td>Exported chat files</td><td>KakaoTalk's official feature</td><td><code>%LOCALAPPDATA%\KakaoKit\exports\</code> (⏳)</td><td>No</td><td>They contain other people's chats. 1 latest copy and 3 snapshots per room, deleted after 30 days.</td></tr>
 <tr><td>Password</td><td>Not handled</td><td>Not stored</td><td>Not applicable</td><td>The user logs in directly in the KakaoTalk app.</td></tr>
 </tbody></table></div>
@@ -572,13 +621,17 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li><strong>The <code>KAKAO_KIT_HOME</code> environment variable</strong> can change the data folder (originally for testing). It also applies in real use, so using a folder other than the default is planned to be shown on every command (⏳ step 11).
 </li>
-<li><strong>Real behaviour of the key input method</strong>: whether the newly built input method (SendInput) really works in KakaoTalk, and how false alarms of human-hand detection turn out, has not yet been checked for real (⏳ steps 7 and 8).
+<li><strong>Real behaviour of the key input method</strong>: with the newly built input method (SendInput), clicking, pasting (<code>Ctrl+V</code>), double-clicking and closing a window passed in real KakaoTalk. <code>Enter</code>, <code>Ctrl+S</code>, <code>Ctrl+A</code>, other keyboards and input methods, and false alarms of human-hand detection (stopping although nobody touched anything) have not been checked yet (⏳ steps 7-9).
 </li>
 <li><strong>Timing of restoring the clipboard right after pasting</strong>: if it is restored before KakaoTalk has finished pasting, the original clipboard text could be sent instead, so a waiting time before restoring is planned and will be checked for real (⏳ step 8).
 </li>
 <li><strong>Programs that briefly lock the clipboard</strong>: the Windows clipboard history or a capture tool can hold the clipboard right after a change. The kit checks the result of reading and writing, retries, and stops the work if it still fails.
 </li>
 <li><strong>A malicious program already running under the same account</strong> cannot be stopped by this kit. This is a general limit.
+</li>
+<li><strong>A decision that leans on on-screen text reading</strong>: the room-opening decision "the search result is exactly 1 row" leans on values measured with KakaoTalk 26.9.1.5339, the open-chat tab and the reference window size, and is affected by the accuracy of the Korean text-reading engine. It was built to stop on the side of not opening when the values differ or the text cannot be read, and the wrong room has never been opened on a real screen, but not every screen was checked. It must be checked again for ordinary rooms (1:1 and group chats) and for a screen where KakaoTalk has changed again.
+</li>
+<li><strong>Opening a room cannot be undone</strong>: opening a room can show a "read" mark to the other person. So it opens only after checking the allowed room, exactly one search result and the matching window title, but even when the checks were right, there is no way to undo a read mark that has already appeared.
 </li></ol>
 <a id="files"></a>
 <h2>13. Where files and documents are</h2>
@@ -602,7 +655,8 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 │  └─ Build-Readme.ps1              tool that makes the html of the README
 ├─ docs                             design document, plan, research notes
 ├─ tasks                            task checklist and progress record
-└─ .remember, .sodam-re             folders made by other development tools (unrelated to the kit, not uploaded to Git)</code></pre>
+├─ CHECKPOINT.md                    notes for picking development up again (only on the development PC, not uploaded to Git)
+└─ .remember, .sodam-re, .omc etc.  folders made by other development tools (unrelated to the kit, not uploaded to Git)</code></pre>
 <h3>Where the documents are</h3>
 <div class="table-wrap"><table>
 <thead><tr><th>Document</th><th>Location</th><th>Content</th></tr></thead>
@@ -628,7 +682,27 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody></table></div>
 <a id="changelog"></a>
 <h2>14. Update summary (click to expand)</h2>
-<p>Click a title to expand it. Work was done from 2026-10-27 to 2026-10-30. The test counts are the number of automated tests that passed at that point.</p>
+<p>Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The test counts are the number of automated tests that passed at that point.</p>
+<details>
+<summary><strong>Full check of this guide</strong> — tests 261 → 262</summary>
+<ul>
+<li>I re-checked the guide against what has been built so far: the status, date and "at a glance" table at the top, steps 7-9 and the change of work order in chapter 2, the Korean on-screen text reading (OCR) requirement in chapter 3, the command table in chapter 8, how opening a room works and its flow in chapters 9-10, the parts table in chapter 11, the on-screen reading data flow and limits in chapter 12, the full list of on-screen messages in chapter 15, the FAQ in chapter 16, the split between what the license allows and the owner's policy in chapter 17, the development rules in chapter 18 and the glossary in chapter 19.
+</li>
+<li>During the check I found 29 on-screen messages that were missing from the guide (room-opening, gatekeeper, clipboard, settings and file-reading messages that chapter 15 did not have). All are now in chapter 15, and I added one test so that new messages cannot be left out of the guide in the future (I wrote the test first, confirmed it failed, and then fixed the documents).
+</li>
+<li>Limit: the only things the tests check mechanically are the test counts, command status, version, on-screen messages, links and the Korean/English structure. The rest of the text was matched against the code and the records by an AI, and has not yet had a final review by a person.
+</li></ul>
+</details>
+<details>
+<summary><strong>Mid-way verification</strong> — tests 257 → 261</summary>
+<ul>
+<li>In the middle of development I checked normal flows, exceptions, wrong input, boundary values and failures (no input was sent to KakaoTalk). Automated tests passed 257 of 257 three times in a row, a syntax check, the encoding rules, a search for 8 kinds of sensitive-data patterns (0 hits in the 43 tracked files), code searches for forbidden input, network, privilege-raising and run-text-as-code constructs, real runs of <code>kakao.cmd</code> and <code>시작.bat</code> (normal, no argument, unknown command, upper case, extra argument, empty argument, Korean, 7000 characters, spaces and Korean in the path, another folder), and about 50 boundary values of settings, parser and log.
+</li>
+<li>Four things found and fixed: ① A message that pointed to the non-existent <code>kakao help</code> now points to <code>version</code>. ② Working out the data folder on a drive that does not exist ended with an English system error; this is fixed. ③ I reproduced directly that when <code>&amp;</code> or <code>|</code> reaches <code>kakao.cmd</code> without quotes, what follows it really runs as a command, so I corrected the explanations in chapters 12 and 14 and pinned both paths (<code>kakao.cmd</code> and calling <code>src\kakao.ps1</code> directly) with tests. ④ Where the guide's quotes of on-screen messages differed from the message dictionary, an existing test caught it and it was fixed.
+</li>
+<li>4 tests were added. Not done (not run): real input into KakaoTalk, and static analysis (PSScriptAnalyzer is not installed).
+</li></ul>
+</details>
 <details>
 <summary><strong>Room-opening parts (M7 main work)</strong> — tests 184 → 230</summary>
 <ul>
@@ -643,6 +717,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <li>Limits: the click positions and the result area come from screens of KakaoTalk 26.9.1.5339 with a 588x753 window (150% scaling) on the open-chat tab. Reading two real screens (one result, several results) with the text reader showed that the icon in front of the room name is read as the digit 0 and the left-menu icons are read as characters, so "exactly one result" was not judged correctly (an error on the safe side: the room is not opened). I changed the check to use the positions of the word boxes and added 19 tests (tests 230 → 249). The same KakaoTalk window shows a different pixel size depending on the monitor's scale setting (588x753 at 150%, 392x502 at 100%), so the check now converts its measured pixel values by the scale of the monitor the window is on. This scale conversion has been confirmed on real screens at 150% and 100%; other scales such as 125% and 200% have been checked only with test data. After the fix I re-read the real one-result screen once and it was judged "exactly one result" (the several-results screen was not captured again after the fix and was checked only with test data). The real room-opening and closing test passed once at 100% (one double-click on the first result row, the new window's title confirmed to equal the room name letter for letter, then closing only the window the kit opened, 7.4 s; the search-icon click and the paste steps were skipped because the screen was prepared in advance). It has not been run at 150% or through the whole flow that starts with the search-icon click.
 </li>
 <li>So that the paste overwrites any text left in the search box from earlier, the kit now does <strong>select all (Ctrl+A)</strong> after clicking the search icon. It only selects (it does not delete or send anything), and its behavior in real KakaoTalk has not been tested yet. When opening a room stops, it also tells you why (the window size or monitor scale differs from the reference, or the window is covered). I wrote 8 tests first, confirmed they failed, and then implemented (tests 249 → 257).
+</li></ul>
+</details>
+<details>
+<summary><strong>Change of work order: reading first, sending after</strong> — test count unchanged</summary>
+<ul>
+<li>I swapped the order of step 8 (sending) and step 9 (reading) in the plan. The user approved it on 2026-10-30, and the reasons are in chapter 2 (without reading, the result of sending cannot be confirmed; the parser already exists and can be tested with synthetic data; the first <code>Enter</code> can be tried in a file-save window).
+</li>
+<li>Only documents changed; the code did not change.
 </li></ul>
 </details>
 <details>
@@ -792,9 +874,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <details>
 <summary><strong>What comes next (steps 7-13)</strong></summary>
 <ul>
-<li>7: opening a room / 8: sending a message / 9: export, read, search / 10: status, version, login guidance / 11: command router, menu, help / 12: first run, update, uninstall / 13: acceptance test, final guide
+<li>7: opening a room (left: testing the whole flow from clicking the search icon, connecting it to a command) / 9: export, read, search (first) / 8: sending a message (after step 9, after a separate approval) / 10: status, version, login guidance / 11: command router, menu, help / 12: first run, update, uninstall / 13: acceptance test, final guide
 </li>
-<li>From step 7, tests that operate the real KakaoTalk begin, and before that the user must not touch the keyboard or mouse.
+<li>Tests that operate the real KakaoTalk are run only after the user explicitly says to start, for no more than 60 seconds at a time, with one sub-step per round. The user must keep their hands off the keyboard and mouse meanwhile. Each screen capture is approved one by one and deleted right after checking.
 </li></ul>
 </details>
 <a id="troubleshooting"></a>
@@ -833,8 +915,49 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td><code>이 작업은 사람이 직접 해야 합니다. 자동 실행으로는 할 수 없습니다.</code></td><td>Changing the allowed list or giving consent was tried by automated execution.</td><td>Open <code>시작.bat</code> and do it yourself.</td></tr>
 <tr><td><code>먼저 사용 동의가 필요합니다. 시작.bat 을 열어 안내에 따라 동의해 주세요.</code></td><td>No command runs before consent is given.</td><td>Open <code>시작.bat</code> and give consent by following the guidance.</td></tr>
 </tbody></table></div>
+<h3>When opening a room stopped (messages that appear once the feature is connected)</h3>
+<p>Every message below means the kit stopped. If it stopped after the double-click, the room may already have been opened. The feature is not connected to a command yet, so you cannot see these on screen now. The kit always prints them in Korean; the meaning is given here.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Message on screen</th><th>Meaning</th><th>What to do</th></tr></thead>
+<tbody>
+<tr><td><code>허용 목록에 없는 방이라 열지 않았습니다: &lt;방 이름&gt;</code></td><td>The room is not an allowed one, so no input was made.</td><td>Check the room name and the allowed list. Only a person can change the allowed list.</td></tr>
+<tr><td><code>카카오톡 메인 창을 하나만 찾지 못했습니다. 카카오톡이 실행 중인지, 로그인되어 있는지 확인해 주세요. 방을 열지 않았습니다.</code></td><td>There is no KakaoTalk main window, or there are two or more.</td><td>Start KakaoTalk and log in, make sure only one main window is visible, and run it again.</td></tr>
+<tr><td><code>같은 제목의 창이 둘 이상 있어 어느 창인지 알 수 없습니다. 아무것도 하지 않았습니다. (방: &lt;방 이름&gt;)</code></td><td>Several windows have the same name, so it cannot tell which one is meant (it checks both before and after opening).</td><td>Close the duplicate windows so only one is left, and run it again.</td></tr>
+<tr><td><code>화면 글자 읽기(OCR)를 쓸 수 없어 검색 결과가 정확히 1건인지 확인하지 못했습니다. 방을 열지 않았습니다.</code></td><td>Korean text reading is not available, so the search result could not be checked.</td><td>Check that Windows has Korean text reading (Chapter 3). A person can allow "open without checking", but that is not recommended because another room might be opened.</td></tr>
+<tr><td><code>검색 결과가 정확히 1건인지 확인하지 못해 방을 열지 않았습니다. (방: &lt;방 이름&gt;)&lt;설명&gt;</code></td><td>The search result is not exactly one room name, or the screen differs from the reference, so it could not be checked. It did not double-click. The <code>&lt;설명&gt;</code> after it tells the cause, in one of the two ways below. If there is no explanation, other rows are mixed into the result or the screen layout (tab and so on) differs from the reference.</td><td>Act on the explanation and run it again.</td></tr>
+<tr><td>“카카오톡 창 크기가 기준과 다릅니다(지금 가로x세로, 모니터 배율 N%, 기준 가로x세로). 창 크기를 바꾸지 말고 원래 크기로 두거나, 창을 쓰던 모니터로 옮겨 주세요.” (the explanation after the message above)</td><td>The KakaoTalk window size was changed, or the window was moved to a monitor with different display scaling.</td><td>Do not touch the window size: keep the original size, or move the window back to the monitor it was used on.</td></tr>
+<tr><td>“카카오톡 창의 검색 결과 부분이 다른 창에 가려져 있습니다. 가리는 창을 치워 주세요.” (the explanation after the message above)</td><td>Another window covers the search-result area.</td><td>Move the covering window away and run it again.</td></tr>
+<tr><td><code>방 창이 시간 안에 열리지 않았습니다. 아무 창도 닫지 않았습니다. (방: &lt;방 이름&gt;)</code></td><td>The room window did not appear within 8 seconds after the double-click.</td><td>Check by yourself whether the room window appeared late. The room may already have been opened.</td></tr>
+<tr><td><code>열린 창의 제목이 방 이름과 달라 그 창을 닫고 멈췄습니다. 더 입력하지 않았습니다.</code></td><td>The window opened by the double-click was not the allowed room, so only that window was closed and it stopped.</td><td>Check that no other room has a similar name and that the search result is right. That room was already opened, so a read mark is likely to have appeared.</td></tr>
+<tr><td><code>검색 결과를 확인하지 않고 방을 열었습니다(사람이 허용). 다른 방이 열렸을 수 있습니다.</code></td><td>A warning that a person allowed "open without checking", so the result was not checked.</td><td>Check by yourself that the room that opened is the right one.</td></tr>
+</tbody></table></div>
+<h3>Other messages (messages that appear once the feature is connected)</h3>
+<p>These messages are also already in the code, but the matching commands are not connected yet, so you cannot see them on screen now. Where a row says "program error", it is not your fault: an internal check of the kit stopped it, so please tell the developer.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Message on screen</th><th>Meaning</th><th>What to do</th></tr></thead>
+<tbody>
+<tr><td><code>대상 창 제목이 정해지지 않아 입력하지 않았습니다.</code></td><td>There was no window title to check before input (program error). No input was made.</td><td>Tell the developer.</td></tr>
+<tr><td><code>작업을 시작하기 전 확인(키보드·마우스에서 손 떼기)이 먼저 필요합니다. 입력하지 않았습니다.</code></td><td>It tried to send input without the hands-off check (program error). No input was made.</td><td>Tell the developer.</td></tr>
+<tr><td><code>허용되지 않은 키라서 보내지 않았습니다: &lt;키 이름&gt;</code></td><td>It tried to send a key that is not among the 5 allowed keys (program error). It was not sent.</td><td>Tell the developer.</td></tr>
+<tr><td><code>허용되지 않은 키 조합이라 보내지 않았습니다.</code></td><td>The input layer (C#) checked once more and blocked it (program error).</td><td>Tell the developer.</td></tr>
+<tr><td><code>마우스 위치가 바뀌어 클릭하지 않았습니다.</code></td><td>The mouse moved after the check and before the click. It did not click.</td><td>Take your hand off the mouse and run it again.</td></tr>
+<tr><td><code>입력을 보내지 못했습니다.</code></td><td>Windows did not accept the key or mouse input.</td><td>Put the KakaoTalk window in front and run it once more. If the same message keeps appearing, tell the developer.</td></tr>
+<tr><td><code>카카오톡 창이 아니라서 닫지 않았습니다.</code></td><td>The window it was going to close does not belong to KakaoTalk, so no close request was sent.</td><td>Nothing happened. Close that window yourself if you need to.</td></tr>
+<tr><td><code>이 실행 방식에서는 클립보드를 쓸 수 없습니다. 시작.bat 이나 kakao.cmd 로 실행해 주세요.</code></td><td>The clipboard can be used only in the intended way of running.</td><td>Run it with <code>시작.bat</code> or <code>.\kakao.cmd</code>.</td></tr>
+<tr><td><code>클립보드에 글을 넣지 못했습니다. 입력하지 않았습니다.</code></td><td>The text to send was put on the clipboard, but it could not be confirmed that it arrived.</td><td>Run it again a little later. Check whether another program is holding the clipboard.</td></tr>
+<tr><td><code>이 작업은 키보드로 직접 입력하는 창에서만 할 수 있습니다. 시작.bat 으로 여세요.</code></td><td>A job only a person may do was tried while the input comes from a file or another program.</td><td>Open <code>시작.bat</code> and type it yourself on the keyboard.</td></tr>
+<tr><td><code>방 이름이 올바르지 않습니다. 비어 있거나, 앞뒤에 공백이 있거나, 줄바꿈이나 보이지 않는 글자가 들어 있거나, 100자를 넘으면 안 됩니다.</code></td><td>The room name breaks the rules (empty, spaces at the ends, a line break or invisible character, or over 100 characters).</td><td>Fix the room name so that it follows the rules.</td></tr>
+<tr><td><code>이미 등록된 방입니다: &lt;방 이름&gt;</code></td><td>A room with the same name is already on the allowed list.</td><td>It is already registered, so just use it.</td></tr>
+<tr><td><code>등록되지 않은 방입니다: &lt;방 이름&gt;</code></td><td>It tried to change the permissions of, or remove, a room that is not on the allowed list.</td><td>Check the room name.</td></tr>
+<tr><td><code>방 종류가 올바르지 않습니다: &lt;값&gt;  (open, self, normal 중 하나)</code></td><td>A value that is not allowed was given as the room kind.</td><td>Change it to one of <code>open</code>, <code>self</code> or <code>normal</code>.</td></tr>
+<tr><td><code>권한 이름이 올바르지 않습니다: &lt;값&gt;  (aiRead, aiSend, canSend 중 하나)</code></td><td>The permission name is wrong.</td><td>Change it to one of <code>aiRead</code>, <code>aiSend</code> or <code>canSend</code>.</td></tr>
+<tr><td><code>내보내기 파일을 찾을 수 없습니다: &lt;파일 경로&gt;</code></td><td>The export file to read is not at that path.</td><td>Check the path and the file name.</td></tr>
+<tr><td><code>카카오톡 내보내기 파일이 아닙니다: &lt;파일 경로&gt;</code></td><td>The first line of the file is not in the KakaoTalk export format.</td><td>Specify a text file saved with KakaoTalk's chat export.</td></tr>
+<tr><td><code>화면 글자를 읽지 못했습니다.</code></td><td>On-screen text reading did not finish within 15 seconds, or it failed.</td><td>Check that the KakaoTalk window is visible and run it again.</td></tr>
+<tr><td><code>기록(로그)을 파일에 쓰지 못했습니다. 동작은 계속합니다.</code></td><td>The record file could not be written, but the work went on (a warning).</td><td>Check the permissions and free disk space of the <code>%LOCALAPPDATA%\KakaoKit</code> folder.</td></tr>
+</tbody></table></div>
 <h3>When you report a problem</h3>
-<p>For now, the message shown on screen and <code>%LOCALAPPDATA%\KakaoKit\logs\kakao.log</code> (if it exists) are your clues. The part that builds an error report exists, but it is not connected to a command yet (⏳ step 11). The report contains no chat content but may contain room names, so check it before sending it to anyone.</p>
+<p>For now, the message shown on screen and <code>%LOCALAPPDATA%\KakaoKit\logs\kakao.log</code> (if it exists) are your clues. The part that builds an error report exists, but it is not connected to a command yet (⏳ step 11). The report contains no chat content but may contain room names, so check it before sending it to anyone. The report holds, under the title <code>카카오톡 키트 오류 보고서 (대화 내용은 들어 있지 않습니다)</code>, the kit, KakaoTalk, Windows and PowerShell versions, whether it runs as administrator, and the last 50 record lines.</p>
 <a id="faq"></a>
 <h2>16. Frequently asked questions (FAQ)</h2>
 <p><strong>Q1. Is this an official program made by Kakao?</strong></p>
@@ -873,6 +996,16 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>The license is the open-source Apache License 2.0 (owner: SoDam AI Studio). However, the repository is private for now. The license lets you use it at work too, but Kakao's terms, personal information, advertising rules and trademarks must be checked separately. Please read <a href="#legal">Chapter 17</a>.</p>
 <p><strong>Q18. Can I read this document without the internet?</strong></p>
 <p>Yes. <code>README.html</code> is a document that works as a single file; just open it in a browser.</p>
+<p><strong>Q19. Why is reading a chat built before sending a message?</strong></p>
+<p>Because without reading you cannot confirm that a sent message really went through (design document 13.7 reports the result of a send as confirmed, failed or unknown, and says not to resend automatically when it is unknown). Also, if the first <code>Enter</code> key is pressed in a file-save window instead of in a message that goes to someone else, a mistake does less harm. The order was changed with the user's approval on 2026-10-30 (Chapter 2).</p>
+<p><strong>Q20. Has opening a room been tested in real KakaoTalk?</strong></p>
+<p>Only in part. On a 100% screen, in a test room where I am alone, "double-click the first result → check the new window's title → close only the window the kit opened" passed (7.4 seconds). The whole flow starting from clicking the search icon, selecting all in the search box (<code>Ctrl+A</code>), a 150% monitor and ordinary rooms (1:1 and group chats) have not been tested yet. It is also not connected to a command yet, so you cannot call it yourself.</p>
+<p><strong>Q21. Does on-screen text reading (OCR) save my screen or send it out?</strong></p>
+<p>The kit does not. It reads the KakaoTalk window in memory only and writes nothing to disk, and the text it reads is used only to decide the search result and is never logged or printed. The kit's code has no part that connects to the internet (how the text-reading feature inside Windows works internally was not checked). Because other rooms' names can appear on screen, captures taken during development for a person to look at are approved one by one and deleted right after checking.</p>
+<p><strong>Q22. Is it fine if I have several monitors or different display scaling?</strong></p>
+<p>Yes. Opening a room is judged according to the scaling of the monitor the KakaoTalk window sits on (this calculation was checked on 100% and 150% screens, and a room was really opened only at 100%), and if the window size differs from the reference it does not open and stops. Other scalings such as 125% and 200% were checked only with fake test data. If you move the window to a monitor with different scaling, or change its size, during the work, the safety device stops.</p>
+<p><strong>Q23. Does the owner of this project use it commercially or give it to other people?</strong></p>
+<p>No. On 2026-10-30 the owner decided to use it <strong>for personal use only</strong>. It is not published, officially distributed, given to others or used commercially, and doing any of that needs a lawyer's check first. The Apache License 2.0 allows such uses legally, but the risk from Kakao's operating policy stays. See <a href="#legal">Chapter 17</a> for details.</p>
 <a id="legal"></a>
 <h2>17. Legal, copyright, license and commercial use</h2>
 <blockquote>
@@ -929,6 +1062,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody></table></div>
 <h3>17.6 Commercial use (strict standard)</h3>
 <p><strong>The Apache License 2.0 permits commercial use.</strong> Uses like the following are also permitted by the license if you keep the conditions of 17.3 (keep the copy of the license and the copyright notices, mark your changes).</p>
+<p><strong>However, the policy of this project's owner is narrower than the license.</strong> On 2026-10-30 the owner decided to use it for personal use only, and does not publish it, officially distribute it, give it to others or use it commercially (doing any of that needs a lawyer's check first). What follows explains what the license permits legally; it does not mean that the owner will use it that way.</p>
 <ul>
 <li>Selling it, subscriptions, or including it in a paid service or product
 </li>
@@ -959,14 +1093,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li></ul>
 <h3>17.8 What is and is not allowed (summary)</h3>
 <div class="table-wrap"><table>
-<thead><tr><th>What you want to do</th><th>Is it possible?</th></tr></thead>
+<thead><tr><th>What you want to do</th><th>Possible under the license?</th><th>The owner's policy (decided 2026-10-30)</th></tr></thead>
 <tbody>
-<tr><td>Testing and using it on my own PC</td><td>Possible (use is at one's own responsibility)</td></tr>
-<tr><td>Copying the folder and handing it to someone</td><td>Possible (hand over a copy of <code>LICENSE</code> and the copyright notices with it)</td></tr>
-<tr><td>Publishing it on the internet (GitHub, etc.)</td><td>Possible under the license. But whether this repository is made public is the owner's decision, and before that personal identifying information such as the test room name and the risk under Kakao's terms must be checked again.</td></tr>
-<tr><td>Modifying the code and using it</td><td>Possible (mark the changed files with a notice that they were changed)</td></tr>
-<tr><td>Using it commercially</td><td>Possible under the license. The separate checks in 17.6 (terms, personal information, advertising rules, trademarks) must be kept.</td></tr>
-<tr><td>Quoting part of the document</td><td>Possible (keep the license conditions)</td></tr>
+<tr><td>Testing and using it on my own PC</td><td>Possible (use is at one's own responsibility)</td><td>Used only with the owner's own account on the owner's own computer, and tested only in a room where the owner is alone.</td></tr>
+<tr><td>Copying the folder and handing it to someone</td><td>Possible (hand over a copy of <code>LICENSE</code> and the copyright notices with it)</td><td>Not done. Doing it needs a lawyer's check first.</td></tr>
+<tr><td>Publishing it on the internet (GitHub, etc.)</td><td>Possible. But before that, personal identifying information such as the test room name, the author information left in the history, and the risk under Kakao's terms must be checked again.</td><td>Not done. The repository stays private, and the owner decides on making it public only after confirming which repository and which direction.</td></tr>
+<tr><td>Modifying the code and using it</td><td>Possible (mark the changed files with a notice that they were changed)</td><td>Possible if it is for one's own use.</td></tr>
+<tr><td>Using it commercially</td><td>Possible. The separate checks in 17.6 (terms, personal information, advertising rules, trademarks) must be kept.</td><td>Not done. Doing it needs a lawyer's check first.</td></tr>
+<tr><td>Quoting part of the document</td><td>Possible (keep the license conditions)</td><td>Possible.</td></tr>
 </tbody></table></div>
 <h3>17.9 When changing the license or accepting contributions (a note for the owner)</h3>
 <p>To change the license, the <code>LICENSE</code> file, this Chapter 17 and the same chapter of the Korean guide must be changed together. The rights of people who already received it under this license remain. No outside code is mixed into this project, so there is no restriction coming from third parties. When accepting contributions from outside people, unless stated otherwise, a contribution is treated as submitted under the same Apache License 2.0 terms (license section 5).</p>
@@ -992,8 +1126,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Status.Tests.ps1</code></td><td>23</td><td>Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests</td></tr>
 <tr><td><code>Ocr.Tests.ps1</code></td><td>47</td><td>The window-size check and the reason a stop is explained (read-only), deciding whether the search result is only the room name (second row, search-box text, ad, longer names, digits glued to the name, another room's preview text, the name column, the click height, the window size, space differences), the real screen layout (the icon read as 0, left-menu text, a line with the front of the name missing, several rows), checking that the window is not covered, the fake-capture connection, the text-reading engine (including word boxes), no writing to disk and no input</td></tr>
 <tr><td><code>Room.Tests.ps1</code></td><td>26</td><td>Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source</td></tr>
-<tr><td><code>Readme.Tests.ps1</code></td><td>28</td><td>The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner</td></tr>
-<tr><td><strong>Total</strong></td><td><strong>261</strong></td><td></td></tr>
+<tr><td><code>Readme.Tests.ps1</code></td><td>29</td><td>The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), that every on-screen message the kit can show is in the guide, the LICENSE text and owner</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>262</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>Building the guide html</h3>
 <p>The sources of the guide are <code>README.md</code> and <code>README.en.md</code>. The html is made with the tool below and must not be edited by hand.</p>
@@ -1004,7 +1138,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Build-Readme.ps1 -Chec
 <p>There is <strong>no</strong> build step that compiles or bundles. The script files are run as they are, and the C# snippets are compiled automatically while running. Only the html of the guide is made, with <code>tools\Build-Readme.ps1</code> above.</p>
 <h3>Deployment and running the repository (GitHub)</h3>
 <ul>
-<li>Repository: a private GitHub repository. Making it public is decided by the owner, and before that personal identifying information (the test room name, local paths) and the risk under Kakao's terms must be checked again.
+<li>Repository: a private GitHub repository. Making it public is decided by the owner, and before that personal identifying information (the test room name, local paths), the author information in the commit history (the records GitHub makes when merging were found to carry the account's public e-mail address in their author field) and the risk under Kakao's terms must be checked again. The history has not been rewritten.
 </li>
 <li>Branches: nothing is pushed straight to the default branch <code>main</code>; work goes from a working branch through a pull request (PR).
 </li>
@@ -1022,7 +1156,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Build-Readme.ps1 -Chec
 </li>
 <li>The allowed keys are only <code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code> and <code>Enter</code>, and there must be no <code>Esc</code> code.
 </li>
-<li>Tests that operate the real KakaoTalk run only when the environment variable <code>KAKAO_E2E=1</code> is set, and the test room is only a room where I am alone (from step 7).
+<li>The switch that turns on tests operating the real KakaoTalk is the environment variable <code>KAKAO_E2E=1</code>, but no automated test uses it yet. The real tests so far were each run separately when the user said to start, and the test room is only a room where I am alone (from step 7).
 </li>
 <li>Static analysis (PSScriptAnalyzer) is not installed, so it could not be run.
 </li></ul>
@@ -1048,6 +1182,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Build-Readme.ps1 -Chec
 <tr><td>BOM</td><td>An invisible mark at the very start of a text file. Windows PowerShell needs it to read Korean files correctly.</td></tr>
 <tr><td>Snapshot</td><td>A copy that keeps the content exactly as it was at a moment.</td></tr>
 <tr><td>False alarm</td><td>Wrongly judging that there is a problem when there is none.</td></tr>
+<tr><td>Text reading (OCR)</td><td>A feature that lets the computer read the text in a picture shown on the screen and turn it into text. This kit uses it to check that a search result holds only one room name.</td></tr>
+<tr><td>Display scaling</td><td>A Windows setting that decides by what percentage the text and windows on a monitor are shown larger. The same window has a different pixel size depending on the scaling.</td></tr>
+<tr><td>Pull request (PR)</td><td>A request to upload changes and have them checked before they are merged into the main line. This project does not push to <code>main</code> directly and goes through a PR.</td></tr>
 </tbody></table></div>
 <p><a href="#top">Back to top</a></p>
 </main>
