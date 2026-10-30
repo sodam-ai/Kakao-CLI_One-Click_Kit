@@ -92,7 +92,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 | 4 | Key input layer and safety device (the "gatekeeper") | ✅ Parts done (testing real input into KakaoTalk is ⏳) |
 | 5 | Saving and restoring the clipboard | ✅ Parts done |
 | 6 | Reading export files (parser) | ✅ Parts done |
-| 7 | Opening a room | ⏳ Preliminary research under way (the kit's code has not yet sent any input to KakaoTalk) |
+| 7 | Opening a room | ⏳ Preliminary research under way (the kit's first input, one click and one paste, passed; opening a room itself is not done yet) |
 | 8 | Sending a message | ⏳ Planned |
 | 9 | Export, read, search | ⏳ Planned |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
@@ -106,7 +106,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 |---|---|
 | Operating system | Windows 11 Home, build 10.0.26300 |
 | PowerShell | Windows PowerShell 5.1 (5.1.26100.9711) |
-| KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, which has not been tested yet (it is not on the tested-version list) |
+| KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, where only one click and one paste have been tested and sending has not (it is not on the tested-version list) |
 | Display language | English (en-US). Even so, every message of the kit is in Korean. |
 | Monitors | 4 (including negative coordinates on a secondary monitor). Display scaling differs per monitor; the monitor holding KakaoTalk is at 150% |
 | Rights | No administrator rights (normal user) |
@@ -114,7 +114,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 
 ### What has not been verified yet (an honest list)
 
-- Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the kit's code has **never sent a key, click or paste to KakaoTalk.** In the step 7 preliminary research, reading the window list passed, and the first input attempt was stopped by the safety guard before any input (a Hangul/English key problem; see chapter 14). (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
+- Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is **one click and one paste in the step 7 preliminary research** (the text was only pasted, nothing was sent, and the safety guard did not stop; see chapter 14). Other keys such as Enter and Ctrl+S, and opening a room, sending and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
 - Actually sending Korean text, multi-line text, long messages and emoji
 - Searching, opening and exporting in ordinary rooms (1:1 and group chats) (the test room is an open chat room, so its window title and search results may differ from ordinary rooms)
 - Behaviour when KakaoTalk is closed or shows the login screen
@@ -578,7 +578,7 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-29. The tes
 <summary><strong>Gatekeeper: Hangul-key exception</strong> — tests 180 → 184</summary>
 
 - When the real-KakaoTalk spike (step 7) started, the gatekeeper stopped before the first click, because the pressed-key check read the Hangul/English key as held down all the time. I confirmed it by only reading key state without sending any key: it was held in 20 of 20 reads, even 30 seconds after the last input. The kit could not send a single input.
-- The pressed-key check now leaves out that one key. It is a mode-switch key, so a paste or click sent while it is held cannot turn into a wrong shortcut. Every other key (Ctrl, Shift, Alt, Esc, Delete, the Windows key, letters and so on) is still blocked. This judgment rests on the nature of the key; it has not yet been confirmed in real KakaoTalk.
+- The pressed-key check now leaves out that one key. It is a mode-switch key, so a paste or click sent while it is held cannot turn into a wrong shortcut. Every other key (Ctrl, Shift, Alt, Esc, Delete, the Windows key, letters and so on) is still blocked. This judgment rested on the nature of the key. On 2026-10-30, on this PC, one real KakaoTalk click and one paste passed without a guard stop and with no abnormal behavior visible in the captures (confirmed once). Other keyboards and input methods, and other kinds of input, have not been checked.
 - Four tests were added (only the Hangul key held passes; Hangul plus Ctrl held is refused because of Ctrl; every other key in the scanned range is refused one by one; the exception list has exactly one entry).
 - After the fix I read the key state again on this PC and saw it change to no key held (0).
 - I brought the guide in line with the development state: the step 7 marker and the verification environment in chapter 2 (KakaoTalk 26.9.1.5339 is a version that has not been tested yet; 4 monitors and their scaling), the "not verified yet" list, three descriptions of the gatekeeper (the Hangul/English key exception), the "another key is held down" remedy in chapter 15, the FAQ in chapter 16, and the note in 17.2 that the terms of the updated version have not been checked again.
@@ -789,7 +789,7 @@ Yes. The development PC has an English display, and the kit's messages are alway
 
 **Q10. What happens when KakaoTalk is updated?**
 
-Only 26.9.0.5337 was verified (KakaoTalk on this PC later updated itself to 26.9.1.5339, which has not been tested yet). In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
+Only 26.9.0.5337 was verified (KakaoTalk on this PC later updated itself to 26.9.1.5339, where only one click and one paste have been tested). In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
 
 **Q11. May I send messages to friends automatically?**
 
