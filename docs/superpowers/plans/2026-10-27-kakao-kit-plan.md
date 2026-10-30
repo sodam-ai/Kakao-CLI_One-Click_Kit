@@ -26,7 +26,7 @@
 - 검증된 카카오톡 버전: `26.9.0.5337`. 그 외는 **읽기 전용**(`--allow-unverified`로만 보내기) (§13.3)
 - 내보내기 보관: 방마다 `latest.txt` + 스냅샷 3개, 30일 초과 스냅샷 삭제 (§13.4)
 - 허용 목록 변경·동의는 사람만, 방마다 `aiRead`/`aiSend` 기본 꺼짐, 친구 방(`type=normal`)은 읽기만 (§13.6)
-- E2E 시험은 `KAKAO_E2E=1`일 때만, 방은 **"비밀방", "나와의 채팅"만** (§11)
+- E2E 시험은 `KAKAO_E2E=1`일 때만, 방은 **"비밀방", "나와의 채팅"만** (§11). **2026-10-30 부터 시험 방은 "비밀방" 대신 "테스트방"**(사용자 결정, 설계서 §4)
 - 사용자 데이터 위치 `%LOCALAPPDATA%\KakaoKit` (시험은 `KAKAO_KIT_HOME`으로 대체) (§8)
 - 종료 코드: 0 성공 · 1 사용법/권한 · 2 가드 중단 · 3 환경 문제(카카오톡 꺼짐 등) · 4 미검증 버전 잠금
 
@@ -150,9 +150,9 @@ tasks/todo.md
 
 **Interfaces:**
 - Consumes: Task 2, 4, 5, 7
-- Produces: `Test-InputBoxEmpty -Hwnd <long> : bool` (입력란 Ctrl+A→Ctrl+C 센티널 방식, 불확실하면 `$false`) · `Send-KakaoMessage -Room <string> -Text <string> [-DryRun] [-Yes] [-Caller human|ai] [-AllowUnverified] : PSCustomObject{Sent,Reason}`; CLI는 `--file <경로>`와 `-`(표준 입력)로 본문을 받을 수 있음(특수문자 안전 경로)
+- Produces: `Test-InputBoxEmpty -Hwnd <long> : bool` (입력란 Ctrl+A→Ctrl+C 센티널 방식, 불확실하면 `$false`) · `Send-KakaoMessage -Room <string> -Text <string> [-DryRun] [-Yes] [-Caller human|ai] [-AllowUnverified] : PSCustomObject{Status('confirmed'|'failed'|'unknown'),Sent,Reason}`(설계서 13.7); CLI는 `--file <경로>`와 `-`(표준 입력)로 본문을 받을 수 있음(특수문자 안전 경로)
 
-- [ ] **Step 1: 시험 작성**: `-DryRun`은 입력 함수 호출 0 · 빈 문자열·1001자 거부 · 허용 목록에 없거나 `canSend=false` 거부 · `-Caller ai`는 `aiSend` 없으면 거부 · 비대화형(`IsInputRedirected`)에서 `selfOnly=false` 방은 `-Yes` 없으면 거부 · 마지막 전송 후 2초 이내 재전송 거부 · 카카오톡 버전 미검증이면 `-AllowUnverified` 없이 종료 코드 4 · 본문 `"a&b|c^d%e!"`·이모지·`` `n `` 포함 문자열이 `Use-TextClipboard`에 **변형 없이** 전달됨(스파이) · `--file`로 읽은 UTF-8 본문도 동일
+- [ ] **Step 1: 시험 작성**: `-DryRun`은 입력 함수 호출 0 · 빈 문자열·1001자 거부 · 허용 목록에 없거나 `canSend=false` 거부 · `-Caller ai`는 `aiSend` 없으면 거부 · 비대화형(`IsInputRedirected`)에서 `selfOnly=false` 방은 `-Yes` 없으면 거부 · 마지막 전송 후 2초 이내 재전송 거부 · 카카오톡 버전 미검증이면 `-AllowUnverified` 없이 종료 코드 4 · 본문 `"a&b|c^d%e!"`·이모지·`` `n `` 포함 문자열이 `Use-TextClipboard`에 **변형 없이** 전달됨(스파이) · `--file`로 읽은 UTF-8 본문도 동일 · **(13.7)** 결과는 확인됨/실패/불명 셋 중 하나이고, 입력을 보낸 뒤 확인하지 못하면 '불명'이며 이때 전송 입력 호출은 1회로 끝난다(자동 재시도 0) · 같은 시도 번호를 다시 쓰면 입력 0으로 거부 · 입력란에 초안이 있으면 입력 0
 - [ ] **Step 2: 실패 확인** → FAIL
 - [ ] **Step 3: 구현** 순서: 검증 → 미리보기/확인 → `Open-KakaoRoom` → 가드 → `Test-InputBoxEmpty` 아니면 중단("작성 중인 글이 있어서 보내지 않았습니다") → 입력란 클릭 → `Use-TextClipboard { Send-KeyCombo Ctrl+V; Send-KeyCombo Enter }` → 전송 시각 기록. 입력란 초안 확인이 스파이크에서 불가로 판명되면 "이미 열려 있으면 중단"으로 후퇴하고 `docs/spike-notes.md`에 기록(§13.2)
 - [ ] **Step 4: E2E**(`KAKAO_E2E=1`): "비밀방"과 "나와의 채팅"에 `[kakao-kit e2e <guid8>]` 한 줄 전송, 한글·여러 줄 각 1회. 읽기 확인은 Task 9에서
