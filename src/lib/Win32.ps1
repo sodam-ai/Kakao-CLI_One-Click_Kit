@@ -219,6 +219,9 @@ function Get-DefaultInputProvider {
     }
 }
 
+# 창 좌표를 실제 화면 픽셀로 읽어야 하는 곳(화면 캡처, Ocr.ps1)이 DPI 설정을 켤 때 쓴다. [KakaoWin32]:: 호출은 이 파일에만 둔다.
+function Enable-KitDpiAwareness { [KakaoWin32]::EnableDpiAwareness() }
+
 # 카카오톡 프로세스가 가진 보이는 최상위 창(저장 대화상자 같은 모달 창 포함). 읽기 전용.
 function Get-KakaoWindows {
     $kakaoPids = @(Get-Process -Name KakaoTalk -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
