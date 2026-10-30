@@ -576,12 +576,12 @@ The settings and records the kit creates are stored separately in your **user fo
 Click a title to expand it. Work was done from 2026-10-27 to 2026-10-30. The test counts are the number of automated tests that passed at that point.
 
 <details>
-<summary><strong>Room-opening parts (M7 main work)</strong> — tests 184 → 222</summary>
+<summary><strong>Room-opening parts (M7 main work)</strong> — tests 184 → 230</summary>
 
 - I built `Room.ps1`, which opens a room in KakaoTalk, and `Ocr.ps1`, which checks the search result with on-screen text reading (OCR). They are not yet connected to a command that a user can call (⏳).
-- The rules come down to one: **if it cannot check, it does not open.** A room that is not on the allowed list gets no input at all; without confirming that the search result is only the room name it does not double-click; and if the new window's title is not the room name letter for letter after opening, it closes that window and stops. A window that was already open is reused but never closed, and only a window the kit opened is closed.
+- The rules come down to one: **if it cannot check, it does not open.** A room that is not on the allowed list gets no input at all; without confirming that the search result is only the room name it does not double-click; and if the new window's title is not the room name letter for letter after opening, it closes that window and stops. A window that was already open is reused but never closed, and only a window the kit opened is closed. The result check looks at only the top line in the room-name column, so another room's preview text that equals the room name cannot pass; it also rejects another room whose name has digits glued right after it (for example a room named with an extra digit), and it does not open when the window is covered or when the window shape or click height differs from the measured values.
 - On a PC without the Korean text reader it does not open by default. Only a person can allow "open without checking", and then a warning is recorded.
-- I wrote 38 tests first and confirmed all of them failed before implementing (22 for opening a room, 16 for text reading). All use fake parts and never touch real KakaoTalk.
+- I wrote 38 tests first and confirmed all of them failed before implementing, and after pushing I added 8 more tests for the 4 gaps an automated security review pointed out and confirmed they failed before fixing them (22 for opening a room, 24 for text reading). All use fake parts and never touch real KakaoTalk.
 - Limits: the click positions and the result area come from one capture of KakaoTalk 26.9.1.5339 with a 588x753 window (150% scaling) on the open-chat tab. Deciding "exactly one result" from real on-screen text reading has not yet been tested with real KakaoTalk.
 
 </details>
@@ -942,10 +942,10 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
-| `Ocr.Tests.ps1` | 16 | Deciding whether the search result is only the room name (second row, search-box text, ad, longer names, space differences), the fake-capture connection, the text-reading engine, no writing to disk and no input |
+| `Ocr.Tests.ps1` | 24 | Deciding whether the search result is only the room name (second row, search-box text, ad, longer names, digits glued to the name, another room's preview text, the name column, the click height, the window shape, space differences), checking that the window is not covered, the fake-capture connection, the text-reading engine, no writing to disk and no input |
 | `Room.Tests.ps1` | 22 | Opening a room: the allowed list first, reusing an already-open window, the check before opening (no double-click when it cannot check), the title check after opening, closing only a window the kit opened, no key other than Ctrl+V in the source |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **222** | |
+| **Total** | **230** | |
 
 ### Building the guide html
 

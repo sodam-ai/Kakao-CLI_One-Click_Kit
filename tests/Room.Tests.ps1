@@ -18,7 +18,7 @@ function New-FakeRoomProvider {
         Click          = { param($hwnd, $relX, $relY, $double, $title) [void]$s.Calls.Add(('Click:{0}:{1},{2}:{3}:{4}' -f $hwnd, $relX, $relY, $double, $title)) }.GetNewClosure()
         PasteText      = { param($hwnd, $text, $title) [void]$s.Calls.Add(('Paste:{0}:{1}:{2}' -f $hwnd, $text, $title)) }.GetNewClosure()
         OcrAvailable   = { [void]$s.Calls.Add('OcrAvailable'); $s.OcrAvailable }.GetNewClosure()
-        ResultIsSingle = { param($hwnd, $name) [void]$s.Calls.Add(('ResultCheck:{0}:{1}' -f $hwnd, $name)); if ($s.ResultThrows) { throw 'ocr broke' }; $s.ResultSingle }.GetNewClosure()
+        ResultIsSingle = { param($hwnd, $name, $clickY) [void]$s.Calls.Add(('ResultCheck:{0}:{1}:{2}' -f $hwnd, $name, $clickY)); if ($s.ResultThrows) { throw 'ocr broke' }; $s.ResultSingle }.GetNewClosure()
         CloseWindow    = { param($hwnd, $title) [void]$s.Calls.Add(('Close:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
         Sleep          = { param($ms) [void]$s.Calls.Add('Sleep') }.GetNewClosure()
     }
@@ -229,7 +229,8 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
             $paste.Count | Should Be 1
             $paste[0] | Should Be 'Paste:10:테스트방:카카오톡'
             $iPaste = $f.Calls.IndexOf($paste[0])
-            $iCheck = $f.Calls.IndexOf('ResultCheck:10:테스트방')
+            # 결과 확인은 더블클릭할 높이(0.335)를 함께 받는다: 확인한 줄과 클릭하는 줄이 같은 위치임을 확인에서 따진다.
+            $iCheck = $f.Calls.IndexOf('ResultCheck:10:테스트방:0.335')
             $iDouble = $f.Calls.IndexOf($clicks[1])
             $iPaste | Should BeLessThan $iCheck
             $iCheck | Should BeLessThan $iDouble

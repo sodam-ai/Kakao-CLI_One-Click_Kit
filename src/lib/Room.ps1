@@ -25,7 +25,7 @@ function Get-DefaultRoomProvider {
         PasteText      = { param($hwnd, $text, $title)
             Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title }.GetNewClosure() }
         OcrAvailable   = { Test-OcrAvailable }
-        ResultIsSingle = { param($hwnd, $name) Test-SearchResultSingle -Hwnd $hwnd -ExpectedName $name }
+        ResultIsSingle = { param($hwnd, $name, $clickY) Test-SearchResultSingle -Hwnd $hwnd -ExpectedName $name -ClickRelY $clickY }
         CloseWindow    = { param($hwnd, $title) Close-KakaoWindow -Hwnd $hwnd -ExpectedTitle $title }
         Sleep          = { param($ms) Start-Sleep -Milliseconds $ms }
     }
@@ -83,7 +83,8 @@ function Open-KakaoRoom {
     & $Provider.PasteText $main $title $mainTitle
     & $Provider.Sleep $script:RoomResultRenderMs
     # 더블클릭 직전의 관문: 결과가 정확히 1건이 아니거나 확인 중 오류가 나면 더블클릭하지 않는다.
-    if ($check -and -not [bool](& $Provider.ResultIsSingle $main $title)) {
+    # 더블클릭할 높이(rowY)를 확인에 함께 넘겨, 확인한 첫 줄과 클릭하는 줄이 같은 위치인지도 따진다.
+    if ($check -and -not [bool](& $Provider.ResultIsSingle $main $title $rowY)) {
         throw (New-KitError -Key 'room.resultNotSingle' -FormatArgs @($title) -ExitCode 2)
     }
     & $Provider.Click $main $rowX $rowY $true $mainTitle

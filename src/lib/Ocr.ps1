@@ -3,9 +3,18 @@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 
-# 검색 결과 영역과 첫 줄의 위치(이미지 높이에 대한 비율). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭의 캡처에서 잡은 값이다(가설).
-# 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 다른 조건에서는 다시 측정해야 한다.
-$script:ResultBand = @{ RegionTop = 0.25; RegionBottom = 0.79; FirstRowBottom = 0.40 }
+# 검색 결과 영역과 첫 줄의 위치(창 크기에 대한 비율). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭의 캡처에서 잡은 값이다(가설).
+# 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 방 이름 줄은 왼쪽에서 0.37 쯤에서 시작한다.
+# 창의 가로/세로 비율(588/753 = 0.78)이 AspectMin~AspectMax 를 벗어나면 이 비율들이 맞지 않으므로 판정하지 않는다(거짓). 다른 조건에서는 다시 측정해야 한다.
+$script:ResultBand = @{
+    RegionTop      = 0.25
+    RegionBottom   = 0.79
+    FirstRowBottom = 0.40
+    TitleLeftMin   = 0.30
+    TitleLeftMax   = 0.50
+    AspectMin      = 0.70
+    AspectMax      = 0.86
+}
 
 # 한국어 글자 읽기 엔진. 없으면 $null (이 PC 에 한국어 OCR 이 없는 경우).
 function Get-OcrEngine {
@@ -71,8 +80,26 @@ function Get-OcrLines {
     }
 }
 
-# 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Height(캡처 높이 픽셀).
-# 창이 다른 창에 가려져 있으면 가린 창의 글자를 읽게 되고, 그러면 아래 판정이 거짓이 되어 방을 열지 않는다(안전 쪽).
+# 판정 영역(검색 결과 부분)이 다른 창에 가려지지 않았는지 확인한다: 영역 안의 여러 지점(가로 3 x 세로 6)마다 그 자리의 맨 위 창이
+# 메인 창인지 본다. 한 곳이라도 다르거나 모르면 거짓이다. 화면 캡처는 "보이는 대로" 읽으므로 가려진 부분의 글자를 놓치거나 가린 창의 글자를 읽을 수 있다.
+function Test-MainWindowUncovered {
+    param([Parameter(Mandatory)][long]$Hwnd, [Parameter(Mandatory)]$Rect, [hashtable]$Provider)
+    if (-not $Provider) { $Provider = Get-DefaultInputProvider }
+    $width = $Rect.Right - $Rect.Left
+    $height = $Rect.Bottom - $Rect.Top
+    foreach ($fx in 0.1, 0.5, 0.9) {
+        foreach ($fy in 0.27, 0.35, 0.45, 0.55, 0.65, 0.75) {
+            $x = [int][Math]::Round($Rect.Left + $fx * $width)
+            $y = [int][Math]::Round($Rect.Top + $fy * $height)
+            $owner = & $Provider.RootAtPoint $x $y
+            if ($null -eq $owner -or [long]$owner -ne $Hwnd) { return $false }
+        }
+    }
+    return $true
+}
+
+# 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Width·Height(캡처 크기 픽셀), Covered(가려져 있으면 참).
+# 판정 영역이 가려져 있으면 읽지 않고 Covered 를 참으로 돌려준다(그러면 아래 판정은 거짓이 되어 방을 열지 않는다).
 function Get-SearchResultLines {
     param([Parameter(Mandatory)][long]$Hwnd)
     $ErrorActionPreference = 'Stop'
@@ -83,6 +110,9 @@ function Get-SearchResultLines {
     $width = $rect.Right - $rect.Left
     $height = $rect.Bottom - $rect.Top
     if ($width -le 0 -or $height -le 0) { throw (New-KitError -Key 'room.mainNotFound' -ExitCode 3) }
+    if (-not (Test-MainWindowUncovered -Hwnd $Hwnd -Rect $rect)) {
+        return [pscustomobject]@{ Lines = @(); Width = $width; Height = $height; Covered = $true }
+    }
     $bitmap = New-Object System.Drawing.Bitmap $width, $height
     try {
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -91,39 +121,62 @@ function Get-SearchResultLines {
         $lines = Get-OcrLines -Bitmap $bitmap
     }
     finally { $bitmap.Dispose() }
-    return [pscustomobject]@{ Lines = $lines; Height = $height }
+    return [pscustomobject]@{ Lines = $lines; Width = $width; Height = $height; Covered = $false }
 }
 
-function Remove-AllWhitespace([string]$Text) { return ($Text -replace '\s', '') }
+# 읽은 제목 줄이 "기대한 방 이름 + (공백 뒤 최대 5자리 참여자 수) + (기호)"로만 이루어졌는지 본다.
+# 이름 안의 공백은 읽기 오차로 보고 무시하지만, 이름 바로 뒤에 붙은 숫자·글자는 다른 이름(예: 테스트방2)이므로 거절한다.
+function Test-RoomTitleText {
+    param([string]$Text, [string]$ExpectedName)
+    if ([string]::IsNullOrEmpty($Text) -or [string]::IsNullOrEmpty($ExpectedName)) { return $false }
+    $chars = @($ExpectedName.ToCharArray() | Where-Object { -not [char]::IsWhiteSpace($_) } | ForEach-Object { [regex]::Escape([string]$_) })
+    if ($chars.Count -eq 0) { return $false }
+    $pattern = '^' + ($chars -join '\s*') + '(?:\s+[0-9]{1,5})?(?:\s*[\p{S}\p{P}])*\s*$'
+    return [regex]::IsMatch($Text.Trim(), $pattern)
+}
 
-# 읽은 줄들이 "기대한 방 하나뿐인 검색 결과"인지 판정한다(화면 없이 시험할 수 있는 순수 함수).
-# 참(true)이 되려면 모두 맞아야 한다: ① 결과 영역 안에 방 이름으로 시작하는 줄이 있고, 그 뒤에는 참여자 수 같은 숫자·기호만 있다
-# ② 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓). 확인하지 못하면 항상 거짓이다.
+# 읽은 줄들이 "기대한 방 하나뿐인 검색 결과"인지 판정한다(화면 없이 시험할 수 있는 순수 함수). 확인하지 못하면 항상 거짓이다.
+# 참(true)이 되려면 모두 맞아야 한다:
+#  ① 창 모양(가로/세로)이 측정한 모양과 비슷하다 ② 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓)
+#  ③ 더블클릭할 높이(ClickRelY)가 첫 줄 안(이름 줄 맨 위 ~ 첫 줄 아래 끝)에 있다 ④ 방 이름 칸(왼쪽에서 0.30~0.50)에서 맨 위에 있는 줄 하나가
+#    방 이름 모양이다. 미리보기·시각 줄은 보지 않는다: 다른 방의 미리보기가 우연히 방 이름과 같아도 통과하지 못한다.
 function Test-SingleResultLines {
-    param([object[]]$Lines = @(), [string]$ExpectedName, [double]$ImageHeight)
-    if ([string]::IsNullOrEmpty($ExpectedName) -or $ImageHeight -le 0) { return $false }
+    param([object[]]$Lines = @(), [string]$ExpectedName, [double]$ImageWidth, [double]$ImageHeight, [double]$ClickRelY)
+    if ([string]::IsNullOrWhiteSpace($ExpectedName) -or $ImageWidth -le 0 -or $ImageHeight -le 0) { return $false }
+    if ($ClickRelY -le 0 -or $ClickRelY -ge 1) { return $false }
+    $aspect = $ImageWidth / $ImageHeight
+    if ($aspect -lt $script:ResultBand.AspectMin -or $aspect -gt $script:ResultBand.AspectMax) { return $false }
     $region = @()
     foreach ($line in @($Lines)) {
         if ($null -eq $line) { continue }
         $center = (([double]$line.Top + [double]$line.Bottom) / 2) / $ImageHeight
         if ($center -ge $script:ResultBand.RegionTop -and $center -le $script:ResultBand.RegionBottom) {
-            $region += [pscustomobject]@{ Text = [string]$line.Text; Center = $center }
+            $region += [pscustomobject]@{
+                Text   = [string]$line.Text
+                Left   = [double]$line.Left / $ImageWidth
+                Top    = [double]$line.Top / $ImageHeight
+                Bottom = [double]$line.Bottom / $ImageHeight
+                Center = $center
+            }
         }
     }
     if ($region.Count -eq 0) { return $false }
     if (@($region | Where-Object { $_.Center -gt $script:ResultBand.FirstRowBottom }).Count -gt 0) { return $false }
-    $want = Remove-AllWhitespace $ExpectedName
-    foreach ($item in $region) {
-        $text = Remove-AllWhitespace $item.Text
-        if ($text.StartsWith($want, [System.StringComparison]::Ordinal) -and $text.Substring($want.Length) -match '^[\d\p{P}\p{S}]*$') { return $true }
-    }
-    return $false
+    # 첫 줄은 이름 줄의 맨 위에서 시작해 FirstRowBottom 에서 끝난다. 미리보기가 비어 이름 줄만 있는 방도 있으므로 글자 덩어리의 아래 끝이 아니라 이 줄 끝을 쓴다.
+    $blockTop = ($region | Measure-Object -Property Top -Minimum).Minimum
+    if ($ClickRelY -lt $blockTop -or $ClickRelY -gt $script:ResultBand.FirstRowBottom) { return $false }
+    $column = @($region | Where-Object { $_.Left -ge $script:ResultBand.TitleLeftMin -and $_.Left -le $script:ResultBand.TitleLeftMax })
+    if ($column.Count -eq 0) { return $false }
+    $title = $column | Sort-Object -Property Top, Left | Select-Object -First 1
+    return (Test-RoomTitleText -Text $title.Text -ExpectedName $ExpectedName)
 }
 
-# 메인 창의 검색 결과가 방 이름 하나뿐인지 확인한다. -Capture 는 시험이 가짜 캡처를 끼우는 자리다.
+# 메인 창의 검색 결과가 방 이름 하나뿐인지 확인한다. ClickRelY 는 이어서 더블클릭할 높이다(확인한 줄과 클릭하는 줄이 같은 위치여야 한다).
+# -Capture 는 시험이 가짜 캡처를 끼우는 자리다.
 function Test-SearchResultSingle {
-    param([Parameter(Mandatory)][long]$Hwnd, [string]$ExpectedName, [scriptblock]$Capture)
+    param([Parameter(Mandatory)][long]$Hwnd, [string]$ExpectedName, [double]$ClickRelY, [scriptblock]$Capture)
     if (-not $Capture) { $Capture = { param($h) Get-SearchResultLines -Hwnd $h } }
     $shot = & $Capture $Hwnd
-    return (Test-SingleResultLines -Lines $shot.Lines -ExpectedName $ExpectedName -ImageHeight $shot.Height)
+    if ($null -eq $shot -or $shot.Covered) { return $false }
+    return (Test-SingleResultLines -Lines $shot.Lines -ExpectedName $ExpectedName -ImageWidth $shot.Width -ImageHeight $shot.Height -ClickRelY $ClickRelY)
 }
