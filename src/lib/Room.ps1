@@ -22,8 +22,12 @@ function Get-DefaultRoomProvider {
         Click          = { param($hwnd, $relX, $relY, $double, $title)
             if ($double) { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -Double -ExpectedTitle $title }
             else { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -ExpectedTitle $title } }
+        # 검색창에 남은 글자를 붙여넣기가 덮어쓰도록 전체 선택(Ctrl+A)을 한다. 선택만 하고 지우거나 보내지 않는다.
+        SelectAll      = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+A' -ExpectedTitle $title }
         PasteText      = { param($hwnd, $text, $title)
             Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title }.GetNewClosure() }
+        # 결과를 확인하지 못했을 때 사용자에게 원인(창 크기·배율·가려짐)을 알려 주기 위해 창 상태를 읽는다. 읽기만 하고 입력하지 않는다.
+        Explain        = { param($hwnd) Get-RoomFailureHint -Hwnd $hwnd }
         OcrAvailable   = { Test-OcrAvailable }
         ResultIsSingle = { param($hwnd, $name, $clickY) Test-SearchResultSingle -Hwnd $hwnd -ExpectedName $name -ClickRelY $clickY }
         CloseWindow    = { param($hwnd, $title) Close-KakaoWindow -Hwnd $hwnd -ExpectedTitle $title }
@@ -80,12 +84,17 @@ function Open-KakaoRoom {
     $rowY = $script:RoomAnchors.FirstResultRow[1]
     & $Provider.WaitIdle
     & $Provider.Click $main $iconX $iconY $false $mainTitle
+    # 검색창에 이전에 넣은 글자가 남아 있어도 붙여넣기가 덮어쓰도록 전체 선택을 먼저 한다(실제 카카오톡에서의 동작은 시험으로 확인한다).
+    & $Provider.SelectAll $main $mainTitle
     & $Provider.PasteText $main $title $mainTitle
     & $Provider.Sleep $script:RoomResultRenderMs
     # 더블클릭 직전의 관문: 결과가 정확히 1건이 아니거나 확인 중 오류가 나면 더블클릭하지 않는다.
     # 더블클릭할 높이(rowY)를 확인에 함께 넘겨, 확인한 첫 줄과 클릭하는 줄이 같은 위치인지도 따진다.
     if ($check -and -not [bool](& $Provider.ResultIsSingle $main $title $rowY)) {
-        throw (New-KitError -Key 'room.resultNotSingle' -FormatArgs @($title) -ExitCode 2)
+        # 멈춘 이유를 알려 준다(창 크기·배율이 다르거나 가려진 경우). 설명을 못 얻어도 멈춤 자체는 그대로다.
+        $hint = ''
+        if ($Provider.ContainsKey('Explain')) { try { $hint = [string](& $Provider.Explain $main) } catch { $hint = '' } }
+        throw (New-KitError -Key 'room.resultNotSingle' -FormatArgs @($title, $hint) -ExitCode 2)
     }
     & $Provider.Click $main $rowX $rowY $true $mainTitle
 
