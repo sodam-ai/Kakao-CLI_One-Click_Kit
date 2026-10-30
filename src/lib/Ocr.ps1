@@ -150,6 +150,50 @@ function Test-RoomTitleText {
     return [regex]::IsMatch($Text.Trim(), $pattern)
 }
 
+# 창 크기가 측정한 크기(RefWidth x RefHeight, 배율 RefScale 기준)를 현재 배율(Scale)로 맞춘 크기에서 SizeTolerance 안인지 본다. 읽기만 하는 순수 함수.
+function Test-WindowSizeMatches {
+    param([double]$Width, [double]$Height, [double]$Scale = 1.0)
+    if ($Width -le 0 -or $Height -le 0 -or $Scale -le 0) { return $false }
+    $factor = $Scale / $script:ResultBand.RefScale
+    $refWidth = $script:ResultBand.RefWidth * $factor
+    $refHeight = $script:ResultBand.RefHeight * $factor
+    if ([Math]::Abs($Width - $refWidth) / $refWidth -gt $script:ResultBand.SizeTolerance) { return $false }
+    if ([Math]::Abs($Height - $refHeight) / $refHeight -gt $script:ResultBand.SizeTolerance) { return $false }
+    return $true
+}
+
+# 방 열기가 "검색 결과가 정확히 1건인지 확인하지 못함"으로 멈췄을 때 사용자에게 알려 줄 원인의 종류를 고른다: 창 크기가 다르면 'size',
+# 그렇지 않고 가려져 있으면 'covered', 둘 다 아니면 ''(원인을 알 수 없음). 크기가 다르면 가림 확인의 위치도 맞지 않으므로 크기를 먼저 본다.
+function Get-RoomFailureReasonKey {
+    param([double]$Width, [double]$Height, [double]$Scale = 1.0, [bool]$Covered = $false)
+    if (-not (Test-WindowSizeMatches -Width $Width -Height $Height -Scale $Scale)) { return 'size' }
+    if ($Covered) { return 'covered' }
+    return ''
+}
+
+# 멈춘 이유를 사용자에게 알려 줄 문구. 메인 창의 크기·배율·가려짐만 읽고(입력하지 않는다), 원인을 모르면 빈 글자를 돌려준다. 오류를 던지지 않는다.
+function Get-RoomFailureHint {
+    param([long]$Hwnd)
+    try {
+        Enable-KitDpiAwareness
+        $win = @(Get-KakaoWindows | Where-Object { [long]$_.Hwnd -eq $Hwnd }) | Select-Object -First 1
+        if (-not $win) { return '' }
+        $rect = $win.Rect
+        $width = $rect.Right - $rect.Left
+        $height = $rect.Bottom - $rect.Top
+        $scale = Get-KitWindowScale -Hwnd $Hwnd
+        $covered = -not (Test-MainWindowUncovered -Hwnd $Hwnd -Rect $rect)
+        $key = Get-RoomFailureReasonKey -Width $width -Height $height -Scale $scale -Covered $covered
+        if ($key -eq 'size') {
+            $factor = $scale / $script:ResultBand.RefScale
+            return (Get-Msg -Key 'room.hint.size' -FormatArgs @([int]$width, [int]$height, [int][Math]::Round($scale * 100), [int][Math]::Round($script:ResultBand.RefWidth * $factor), [int][Math]::Round($script:ResultBand.RefHeight * $factor)))
+        }
+        if ($key -eq 'covered') { return (Get-Msg -Key 'room.hint.covered') }
+        return ''
+    }
+    catch { return '' }
+}
+
 # 제목 줄의 단어 상자로 제목 글자를 만든다. 만들 수 없으면 $null(그러면 판정은 거짓이다).
 #  - 이름 시작 위치(NameStartPx - NameStartTolPx) 앞에 있는 단어는 배지 아이콘 칸이다. 글자 한 개짜리 단어 하나만 버린다(아이콘이 0·o 같은 글자로 읽힌다).
 #    글자 내용으로 허용하는 것이 아니라 위치로 구분한다: 이름 안의 0 은 이름 시작 위치에 있다.
@@ -189,10 +233,7 @@ function Test-SingleResultLines {
     if ([string]::IsNullOrWhiteSpace($ExpectedName) -or $ImageWidth -le 0 -or $ImageHeight -le 0 -or $Scale -le 0) { return $false }
     if ($ClickRelY -le 0 -or $ClickRelY -ge 1) { return $false }
     $factor = $Scale / $script:ResultBand.RefScale
-    $refWidth = $script:ResultBand.RefWidth * $factor
-    $refHeight = $script:ResultBand.RefHeight * $factor
-    if ([Math]::Abs($ImageWidth - $refWidth) / $refWidth -gt $script:ResultBand.SizeTolerance) { return $false }
-    if ([Math]::Abs($ImageHeight - $refHeight) / $refHeight -gt $script:ResultBand.SizeTolerance) { return $false }
+    if (-not (Test-WindowSizeMatches -Width $ImageWidth -Height $ImageHeight -Scale $Scale)) { return $false }
     $region = @()
     foreach ($line in @($Lines)) {
         if ($null -eq $line) { continue }

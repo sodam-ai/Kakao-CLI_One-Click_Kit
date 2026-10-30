@@ -11,11 +11,15 @@ function New-FakeRoomProvider {
         OcrAvailable = $true
         ResultSingle = $true
         ResultThrows = $false
+        SelectAllThrows = $false
+        Hint         = ''
     }
     $s.Provider = @{
         Windows        = { [void]$s.Calls.Add('Windows'); if ($s.WindowsQueue.Count -gt 0) { $s.Last = @($s.WindowsQueue.Dequeue()) }; $s.Last }.GetNewClosure()
         WaitIdle       = { [void]$s.Calls.Add('WaitIdle') }.GetNewClosure()
         Click          = { param($hwnd, $relX, $relY, $double, $title) [void]$s.Calls.Add(('Click:{0}:{1},{2}:{3}:{4}' -f $hwnd, $relX, $relY, $double, $title)) }.GetNewClosure()
+        SelectAll      = { param($hwnd, $title) [void]$s.Calls.Add(('SelectAll:{0}:{1}' -f $hwnd, $title)); if ($s.SelectAllThrows) { throw 'select broke' } }.GetNewClosure()
+        Explain        = { param($hwnd) [void]$s.Calls.Add('Explain'); $s.Hint }.GetNewClosure()
         PasteText      = { param($hwnd, $text, $title) [void]$s.Calls.Add(('Paste:{0}:{1}:{2}' -f $hwnd, $text, $title)) }.GetNewClosure()
         OcrAvailable   = { [void]$s.Calls.Add('OcrAvailable'); $s.OcrAvailable }.GetNewClosure()
         ResultIsSingle = { param($hwnd, $name, $clickY) [void]$s.Calls.Add(('ResultCheck:{0}:{1}:{2}' -f $hwnd, $name, $clickY)); if ($s.ResultThrows) { throw 'ocr broke' }; $s.ResultSingle }.GetNewClosure()
@@ -29,7 +33,7 @@ function New-Win([long]$Hwnd, [string]$Title) { [pscustomobject]@{ Hwnd = $Hwnd;
 function Set-TestRooms([object[]]$Rooms) { Save-KitConfig -Config ([pscustomobject]@{ version = 1; consentAcceptedAt = $null; lastRoom = $null; rooms = $Rooms }) }
 function New-TestRoom([string]$Name, [bool]$AiRead = $false) { [pscustomobject]@{ name = $Name; type = 'open'; verified = $true; canRead = $true; canSend = $true; selfOnly = $true; aiRead = $AiRead; aiSend = $false } }
 # 키·마우스·창 닫기처럼 "실제로 입력되는" 호출만 센다.
-function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Click:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
+function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Click:*' -or $_ -like 'SelectAll:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
 
 $MainWin = New-Win 10 '카카오톡'
 
@@ -213,6 +217,77 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
         }
     }
 
+    It 'selects the whole search box between the icon click and the paste, so leftover text is replaced instead of appended' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-OpenScenario
+            $null = Open-KakaoRoom -Name '테스트방' -Provider $f.Provider
+            $select = @($f.Calls | Where-Object { $_ -like 'SelectAll:*' })
+            $select.Count | Should Be 1
+            $select[0] | Should Be 'SelectAll:10:카카오톡'
+            $iIcon = $f.Calls.IndexOf('Click:10:0.714,0.116:False:카카오톡')
+            $iSelect = $f.Calls.IndexOf($select[0])
+            $iPaste = $f.Calls.IndexOf('Paste:10:테스트방:카카오톡')
+            $iIcon | Should BeLessThan $iSelect
+            $iSelect | Should BeLessThan $iPaste
+        }
+    }
+
+    It 'never pastes or double-clicks when the select-all step fails (only the search icon was clicked)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeRoomProvider
+            $f.SelectAllThrows = $true
+            $f.WindowsQueue.Enqueue(@($MainWin))
+            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
+            $e.Message | Should Be 'select broke'
+            @($f.Calls | Where-Object { $_ -like 'Paste:*' }).Count | Should Be 0
+            $clicks = @($f.Calls | Where-Object { $_ -like 'Click:*' })
+            $clicks.Count | Should Be 1
+            $clicks[0] | Should Match ':False:'
+        }
+    }
+
+    It 'adds the reason hint to the stop message when the result is not exactly one row, and never asks for it on success' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeRoomProvider
+            $f.ResultSingle = $false
+            $f.Hint = 'HINT-WINDOW-SIZE'
+            $f.WindowsQueue.Enqueue(@($MainWin))
+            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
+            $e.ExitCode | Should Be 2
+            $e.Message | Should Match '테스트방'
+            $e.Message | Should Match 'HINT-WINDOW-SIZE'
+            ($f.Calls -contains 'Explain') | Should Be $true
+            $ok = New-OpenScenario
+            $null = Open-KakaoRoom -Name '테스트방' -Provider $ok.Provider
+            ($ok.Calls -contains 'Explain') | Should Be $false
+        }
+    }
+
+    It 'still stops with exit 2 and the plain message when the hint is empty, fails, or the provider has no hint step' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $empty = New-FakeRoomProvider
+            $empty.ResultSingle = $false
+            $empty.WindowsQueue.Enqueue(@($MainWin))
+            $e1 = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $empty.Provider }
+            $e1.ExitCode | Should Be 2
+            $e1.Message | Should Not Match 'HINT'
+            $broken = New-FakeRoomProvider
+            $broken.ResultSingle = $false
+            $broken.Provider.Explain = { param($hwnd) throw 'hint broke' }
+            $broken.WindowsQueue.Enqueue(@($MainWin))
+            (Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $broken.Provider }).ExitCode | Should Be 2
+            $none = New-FakeRoomProvider
+            $none.ResultSingle = $false
+            $none.Provider.Remove('Explain')
+            $none.WindowsQueue.Enqueue(@($MainWin))
+            (Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $none.Provider }).ExitCode | Should Be 2
+        }
+    }
+
     It 'opens a room in the documented order: search icon, paste the stored name, check, then double-click the first row' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
@@ -311,11 +386,14 @@ Describe 'Room: Close-KitOpenedWindow' {
 }
 
 Describe 'Room: 소스 규칙' {
-    It 'Room.ps1 sends only Ctrl+V as a key, closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
+    It 'Room.ps1 sends only Ctrl+A (select the search box text) and Ctrl+V as keys, closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
         $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Room.ps1') -Raw -Encoding UTF8
         $keys = @([regex]::Matches($src, "-Keys '([^']*)'") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-        $keys.Count | Should Be 1
-        $keys[0] | Should Be 'Ctrl+V'
+        $keys.Count | Should Be 2
+        $keys[0] | Should Be 'Ctrl+A'
+        $keys[1] | Should Be 'Ctrl+V'
+        # Enter·Delete·Esc 같은 키는 방 열기에서 절대 보내지 않는다(Ctrl+A 는 선택만 하므로 지우거나 보내지 않는다).
+        $src | Should Not Match "-Keys '(Enter|Delete|Backspace|Esc)"
         $src | Should Not Match '\[KakaoWin32\]::'
         $src | Should Not Match 'PostClose|SendInput|mouse_event'
     }

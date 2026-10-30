@@ -295,6 +295,37 @@ Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)
     }
 }
 
+Describe 'Ocr: 창 크기 확인과 멈춘 이유 (읽기만 하는 도우미)' {
+    It 'Test-WindowSizeMatches accepts the measured size at its own scale and refuses other sizes' {
+        Test-WindowSizeMatches -Width 588 -Height 753 -Scale 1.5 | Should Be $true
+        Test-WindowSizeMatches -Width 392 -Height 502 -Scale 1.0 | Should Be $true
+        Test-WindowSizeMatches -Width 392 -Height 502 -Scale 1.5 | Should Be $false
+        Test-WindowSizeMatches -Width 588 -Height 753 -Scale 1.0 | Should Be $false
+        Test-WindowSizeMatches -Width 0 -Height 753 -Scale 1.5 | Should Be $false
+        Test-WindowSizeMatches -Width 588 -Height 753 -Scale 0 | Should Be $false
+        Test-WindowSizeMatches -Width 580 -Height 753 -Scale 1.5 | Should Be $true
+        Test-WindowSizeMatches -Width 579 -Height 753 -Scale 1.5 | Should Be $false
+    }
+
+    It 'Get-RoomFailureReasonKey names the size problem first, then a covered window, and nothing when both are fine' {
+        Get-RoomFailureReasonKey -Width 392 -Height 502 -Scale 1.5 -Covered $false | Should Be 'size'
+        Get-RoomFailureReasonKey -Width 392 -Height 502 -Scale 1.5 -Covered $true | Should Be 'size'
+        Get-RoomFailureReasonKey -Width 588 -Height 753 -Scale 1.5 -Covered $true | Should Be 'covered'
+        Get-RoomFailureReasonKey -Width 588 -Height 753 -Scale 1.5 -Covered $false | Should Be ''
+    }
+
+    It 'Get-RoomFailureHint never throws, even for a window that does not exist, and answers a plain string' {
+        $e = Get-ThrownError { [void](Get-RoomFailureHint -Hwnd 0) }
+        $e | Should BeNullOrEmpty
+        ((Get-RoomFailureHint -Hwnd 0) -is [string]) | Should Be $true
+    }
+
+    It 'the hint messages exist and say what to do' {
+        Get-Msg -Key 'room.hint.size' -FormatArgs @(392, 502, 100, 588, 753) | Should Match '크기'
+        Get-Msg -Key 'room.hint.covered' | Should Match '가려'
+    }
+}
+
 Describe 'Ocr: Test-MainWindowUncovered (판정 영역이 가려지지 않았는가)' {
     $rect = [pscustomobject]@{ Left = 100; Top = 200; Right = 688; Bottom = 953 }
     function New-OwnerProvider($owner) { return @{ RootAtPoint = { param($x, $y) $owner }.GetNewClosure() } }
