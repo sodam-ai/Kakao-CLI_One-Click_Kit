@@ -146,6 +146,8 @@ tasks/todo.md
 
 ## Task 8: 보내기 (E2E 포함)
 
+> **순서 변경 (2026-10-30, 사용자 승인): Task 9(읽기)를 Task 8 보다 먼저 한다.** 읽기가 있어야 보내기 결과의 '확인됨'을 채울 수 있고(설계서 13.7), Task 9 는 Task 8 을 쓰지 않는다. 이유와 비용은 `tasks/progress.md` 의 "M8·M9 순서" 참고. 카카오톡을 만지지 않는 부분의 시험은 먼저 만들어도 된다.
+
 **Files:** Create `src/lib/Send.ps1` · Test `tests/Send.Tests.ps1`
 
 **Interfaces:**
@@ -159,6 +161,8 @@ tasks/todo.md
 - [ ] **Step 5: 통과 확인**
 
 ## Task 9: 내보내기·읽기·검색
+
+> **순서 변경 (2026-10-30): 이 Task 를 Task 8 보다 먼저 한다.** 아래 E2E 의 "Task 8 에서 보낸 토큰"은 먼저 **사용자가 손으로 친 글**로 확인하고, Task 8 이 끝난 뒤 보낸 토큰으로 한 번 더 확인한다.
 
 **Files:** Create `src/lib/Export.ps1`, `src/lib/Search.ps1` · Test `tests/Export.Tests.ps1`
 
