@@ -123,7 +123,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 - How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
 - Static analysis tool (PSScriptAnalyzer): it is not installed, so it could not be run.
 - Reaction of antivirus software and SmartScreen
-- The automation-related clauses of Kakao's operating policy
+- The automation-related clauses of Kakao's operating policy (the original text could not be checked, and a reply in the Kakao Developers forum said that automatic screen operation is prohibited: see 17.2)
 
 <a id="prereq"></a>
 ## 3. Prerequisites and required programs
@@ -850,7 +850,7 @@ Yes. `README.html` is a document that works as a single file; just open it in a 
 ### 17.2 Kakao's terms of service and operating policy
 
 - At the time of development (2026-10-27), it was confirmed that clause 2.2 of the terms of the KakaoTalk installed on this PC (`EULA_ko.txt` in the install folder) prohibits reverse engineering, decompiling and disassembling. So this kit decided not to use such methods. KakaoTalk later updated itself (26.9.1.5339), and **the terms of the updated version have not been checked again.**
-- However, whether Kakao's separate "operating policy" has clauses about automated programs **could not be checked.** So it cannot be said for certain whether using this tool goes against the terms or the operating policy, and there is a possibility of restrictions on the KakaoTalk account (a warning, a temporary suspension, etc.).
+- However, whether Kakao's separate "operating policy" has clauses about automated programs **could not be checked.** So it cannot be said for certain whether using this tool goes against the terms or the operating policy, and there is a possibility of restrictions on the KakaoTalk account (a warning, a temporary suspension, etc.). However, in the Kakao Developers forum on 2026-09-30, a reply to a question about commercializing an open-chat management app that reads the screen automatically and presses KakaoTalk buttons said that the operating policy prohibits "the kind of use you describe". It could not be confirmed whether the person who replied works for Kakao or whether the reply applies as is to this tool (personal use, on my own computer, in a room where I am alone), but treat it as a real possibility that it conflicts and do not rule out the risk.
 - Terms and policies can change. Before using the tool, check the latest terms and operating policy yourself.
 - The kit's risk-reducing measures (only allowed rooms, no bulk sending, a 2-second gap, human-hand detection) lower the risk but do not remove it.
 
