@@ -106,6 +106,23 @@ Describe 'Bootstrap: 한글 문구와 경로' {
         finally { $env:KAKAO_KIT_HOME = $old }
     }
 
+    It 'Get-KitPaths is a pure calculation: a data folder on a drive that does not exist gives paths and no error' {
+        $used = @([System.IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpperInvariant() })
+        $free = @('Z', 'Y', 'X', 'W', 'V', 'U', 'T') | Where-Object { $used -notcontains $_ } | Select-Object -First 1
+        if (-not $free) { return }   # 이 PC 에 비어 있는 드라이브 문자가 없으면 확인할 수 없다(통과로 센다)
+        $old = $env:KAKAO_KIT_HOME
+        $oldEap = $ErrorActionPreference
+        try {
+            $env:KAKAO_KIT_HOME = $free + ':\no such folder'
+            $ErrorActionPreference = 'Stop'   # 제품(kakao.ps1)과 같은 설정: 여기서 던지면 사용자에게 영어 시스템 오류가 보인다
+            $p = Get-KitPaths
+            $p.ConfigFile | Should Be ($free + ':\no such folder\config.json')
+            $p.LogsDir | Should Be ($free + ':\no such folder\logs')
+            $p.ExportsDir | Should Be ($free + ':\no such folder\exports')
+        }
+        finally { $ErrorActionPreference = $oldEap; $env:KAKAO_KIT_HOME = $old }
+    }
+
     It 'Get-KitPaths defaults to LOCALAPPDATA\KakaoKit' {
         $old = $env:KAKAO_KIT_HOME
         try {
@@ -213,5 +230,59 @@ Describe 'Bootstrap: kakao.cmd' {
         $r = Invoke-Cli @('nosuchcommand')
         $r.ExitCode | Should Be 1
         $r.Out | Should Match '[가-힣]'
+    }
+
+    # 'help' 명령이 생기면(11단계) 이 시험과 두 문구를 함께 고친다. 지금은 없는 명령을 안내하면 안내가 제자리를 돈다.
+    It 'does not point to a help command that does not exist: no-command, unknown and "help" all name only commands that work' {
+        foreach ($r in (Invoke-Cli @()), (Invoke-Cli @('nosuchcommand')), (Invoke-Cli @('help'))) {
+            $r.ExitCode | Should Be 1
+            $r.Out | Should Not Match 'kakao help'
+            $r.Out | Should Match 'version'
+        }
+    }
+}
+
+Describe 'Bootstrap: 인자의 특수 글자는 어디서 실행되는가 (알려진 한계 D-07 를 시험으로 고정)' {
+    function Invoke-PsDirect([string]$ArgText, [string]$WorkDir) {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = 'powershell.exe'
+        $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $root 'src\kakao.ps1') + '" ' + $ArgText
+        $psi.WorkingDirectory = $WorkDir
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.RedirectStandardInput = $true
+        $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+        $psi.CreateNoWindow = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.StandardInput.Close()
+        $out = $proc.StandardOutput.ReadToEnd()
+        [void]$proc.StandardError.ReadToEnd()
+        $proc.WaitForExit()
+        @{ ExitCode = $proc.ExitCode; Lines = @(($out -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }) }
+    }
+
+    It 'src\kakao.ps1 called directly (the path automatic callers should use) treats shell characters as plain text: exit 1, nothing runs, no file is created' {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('kakaokit-argtest-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir | Out-Null
+        try {
+            foreach ($payload in 'a&echo PWNED', 'a|echo PWNED', '$(echo PWNED)', 'a>PWNED_FILE.txt', '%OS%', ('a' * 6000)) {
+                $r = Invoke-PsDirect $payload $dir
+                $r.ExitCode | Should Be 1
+                @($r.Lines | Where-Object { $_ -ceq 'PWNED' }).Count | Should Be 0
+                @($r.Lines | Where-Object { $_ -like '*Windows_NT*' }).Count | Should Be 0
+            }
+            @(Get-ChildItem -LiteralPath $dir -Force).Count | Should Be 0
+        }
+        finally { Remove-Item -LiteralPath $dir -Force -Recurse -ErrorAction SilentlyContinue }
+    }
+
+    It 'control: a bare & that reaches kakao.cmd unquoted DOES run what follows (known limit D-07), while a quoted one does not - so the PWNED check can see an execution' {
+        # 이 대조군이 거짓이 되면(= kakao.cmd 쪽이 고쳐지면) 이 시험과 README 의 "알려진 한계" 문구를 함께 고친다.
+        $bare = Invoke-Cli @('a^&echo PWNED')
+        @($bare.Out -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ceq 'PWNED' }).Count | Should Be 1
+        $quoted = Invoke-Cli @('"a&echo PWNED"')
+        @($quoted.Out -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ceq 'PWNED' }).Count | Should Be 0
+        $quoted.ExitCode | Should Be 1
     }
 }

@@ -1,8 +1,8 @@
 ﻿# 한글 문구 사전. 사용자에게 보이는 문장은 여기서만 만든다. (메뉴 항목은 "한글 (english)" 병기, 오류·안내는 한글만)
 $script:KitMessages = @{
     'version.banner'       = '카카오톡 키트 {0}'
-    'error.noCommand'      = '명령이 없습니다. 도움말은 "kakao help" 로 볼 수 있습니다.'
-    'error.unknownCommand' = '알 수 없는 명령입니다: {0}  (도움말: kakao help)'
+    'error.noCommand'      = '명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기)'
+    'error.unknownCommand' = '알 수 없는 명령입니다: {0}  (지금 쓸 수 있는 명령: version)'
     'error.humanOnly'      = '이 작업은 사람이 직접 해야 합니다. 자동 실행으로는 할 수 없습니다.'
     'error.humanNeedsConsole' = '이 작업은 키보드로 직접 입력하는 창에서만 할 수 있습니다. 시작.bat 으로 여세요.'
     'error.consentRequired' = '먼저 사용 동의가 필요합니다. 시작.bat 을 열어 안내에 따라 동의해 주세요.'
