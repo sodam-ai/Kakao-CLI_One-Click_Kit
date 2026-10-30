@@ -92,7 +92,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 | 4 | Key input layer and safety device (the "gatekeeper") | ✅ Parts done (testing real input into KakaoTalk is ⏳) |
 | 5 | Saving and restoring the clipboard | ✅ Parts done |
 | 6 | Reading export files (parser) | ✅ Parts done |
-| 7 | Opening a room | ⏳ Preliminary research under way (with the kit's code, pasting into the search, opening a room, checking the opened window's title and closing it each passed once; not yet available as a command) |
+| 7 | Opening a room | ⏳ Parts done (tested with fake parts); the real-screen test and the connection to a command are not done yet. In the preliminary research, pasting into the search, opening a room, checking the opened window's title and closing it each passed once with the kit's code |
 | 8 | Sending a message | ⏳ Planned |
 | 9 | Export, read, search | ⏳ Planned |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
@@ -457,7 +457,8 @@ Start of work
 | `Guard.ps1` | Handles the check right before input (the gatekeeper), the allowed-key table, human-hand detection and the lock against running twice. | ✅ Parts |
 | `Clip.ps1` | Saves, replaces and restores only the clipboard text, and checks each step. | ✅ Parts |
 | `Parse.ps1` | Turns an export text file into the room name, saved time and message list. | ✅ Parts |
-| `Ocr.ps1`, `Room.ps1` | Checking search results and opening rooms | ⏳ step 7 |
+| `Ocr.ps1` | Decides, with on-screen text reading (OCR), whether the search result is only the room name. It reads the screen in memory only, writes nothing to disk and sends no input. | ✅ Parts (real-screen test is ⏳) |
+| `Room.ps1` | Opens only an allowed room, and only through the search; checks before opening that the result is exactly one row; counts it as success only when the opened window's title equals the room name letter for letter. It does not open when it cannot check. | ✅ Parts (connection to a command is ⏳ step 7) |
 | `Send.ps1` | Sending messages | ⏳ step 8 |
 | `Export.ps1`, `Search.ps1` | Export, read, search | ⏳ step 9 |
 | `Status.ps1` | Reads the installed KakaoTalk version (cross-checking the registry against the running process) and decides whether it is a version that was actually tested. Read-only. The login check and the full status check are added in step 10. | ✅ Parts (minimal) |
@@ -572,7 +573,18 @@ The settings and records the kit creates are stored separately in your **user fo
 <a id="changelog"></a>
 ## 14. Update summary (click to expand)
 
-Click a title to expand it. Work was done from 2026-10-27 to 2026-10-29. The test counts are the number of automated tests that passed at that point.
+Click a title to expand it. Work was done from 2026-10-27 to 2026-10-30. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Room-opening parts (M7 main work)</strong> — tests 184 → 222</summary>
+
+- I built `Room.ps1`, which opens a room in KakaoTalk, and `Ocr.ps1`, which checks the search result with on-screen text reading (OCR). They are not yet connected to a command that a user can call (⏳).
+- The rules come down to one: **if it cannot check, it does not open.** A room that is not on the allowed list gets no input at all; without confirming that the search result is only the room name it does not double-click; and if the new window's title is not the room name letter for letter after opening, it closes that window and stops. A window that was already open is reused but never closed, and only a window the kit opened is closed.
+- On a PC without the Korean text reader it does not open by default. Only a person can allow "open without checking", and then a warning is recorded.
+- I wrote 38 tests first and confirmed all of them failed before implementing (22 for opening a room, 16 for text reading). All use fake parts and never touch real KakaoTalk.
+- Limits: the click positions and the result area come from one capture of KakaoTalk 26.9.1.5339 with a 588x753 window (150% scaling) on the open-chat tab. Deciding "exactly one result" from real on-screen text reading has not yet been tested with real KakaoTalk.
+
+</details>
 
 <details>
 <summary><strong>Gatekeeper: Hangul-key exception</strong> — tests 180 → 184</summary>
@@ -930,8 +942,10 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
+| `Ocr.Tests.ps1` | 16 | Deciding whether the search result is only the room name (second row, search-box text, ad, longer names, space differences), the fake-capture connection, the text-reading engine, no writing to disk and no input |
+| `Room.Tests.ps1` | 22 | Opening a room: the allowed list first, reusing an already-open window, the check before opening (no double-click when it cannot check), the title check after opening, closing only a window the kit opened, no key other than Ctrl+V in the source |
 | `Readme.Tests.ps1` | 28 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), the LICENSE text and owner |
-| **Total** | **184** | |
+| **Total** | **222** | |
 
 ### Building the guide html
 
