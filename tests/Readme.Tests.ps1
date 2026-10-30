@@ -222,6 +222,21 @@ Describe 'README: 내용이 실제와 같다' {
         }
     }
 
+    # 키트가 사용자에게 보여 줄 수 있는 화면 문구는 두 설명서에 모두 있어야 한다(오류 보고서 줄은 제외). 새 문구를 만들고 설명서에 빼먹는 것을 막는다.
+    # 자리 표시자({0}) 앞부분이 글자 그대로 들어 있으면 된다. "(방:" 처럼 끝에 걸친 열린 괄호는 뺀다.
+    It 'every message the kit can show is described in the guide (report lines excepted)' {
+        foreach ($d in $docs.Values) {
+            $text = Read-Utf8 $d.Md
+            foreach ($key in $script:KitMessages.Keys) {
+                if ($key.StartsWith('report.')) { continue }
+                $full = [string]$script:KitMessages[$key]
+                $head = (($full -split '\{')[0]).Trim() -replace '\s*\([^)]*$', ''
+                if ($head.Length -lt 6) { $head = $full.Trim() }
+                if (-not $text.Contains($head)) { throw ('설명서에 없는 화면 문구 (' + $key + '): ' + $head) }
+            }
+        }
+    }
+
     It 'lists the real number of tests per test file and in total' {
         $actual = @{}
         foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $kitRoot 'tests') -Filter '*.Tests.ps1' -File)) {
