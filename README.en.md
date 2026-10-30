@@ -92,7 +92,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 | 4 | Key input layer and safety device (the "gatekeeper") | ✅ Parts done (testing real input into KakaoTalk is ⏳) |
 | 5 | Saving and restoring the clipboard | ✅ Parts done |
 | 6 | Reading export files (parser) | ✅ Parts done |
-| 7 | Opening a room | ⏳ Preliminary research under way (the kit's first input, one click and one paste, passed; opening a room itself is not done yet) |
+| 7 | Opening a room | ⏳ Preliminary research under way (with the kit's code, pasting into the search, opening a room, checking the opened window's title and closing it each passed once; not yet available as a command) |
 | 8 | Sending a message | ⏳ Planned |
 | 9 | Export, read, search | ⏳ Planned |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
@@ -106,7 +106,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 |---|---|
 | Operating system | Windows 11 Home, build 10.0.26300 |
 | PowerShell | Windows PowerShell 5.1 (5.1.26100.9711) |
-| KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, where only one click and one paste have been tested and sending has not (it is not on the tested-version list) |
+| KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, where only clicking, pasting, opening a room and closing its window have been tested, and sending has not (it is not on the tested-version list) |
 | Display language | English (en-US). Even so, every message of the kit is in Korean. |
 | Monitors | 4 (including negative coordinates on a secondary monitor). Display scaling differs per monitor; the monitor holding KakaoTalk is at 150% |
 | Rights | No administrator rights (normal user) |
@@ -114,7 +114,7 @@ Development is split into 13 steps, and steps 1-6 are finished. In the table, "p
 
 ### What has not been verified yet (an honest list)
 
-- Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is **one click and one paste in the step 7 preliminary research** (the text was only pasted, nothing was sent, and the safety guard did not stop; see chapter 14). Other keys such as Enter and Ctrl+S, and opening a room, sending and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
+- Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is **a click, a paste (Ctrl+V), a double-click (opening a room) and a window-close request in the step 7 preliminary research** (no message was sent, and the safety guard did not stop; see chapter 14). Other keys such as Enter and Ctrl+S, and sending messages and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
 - Actually sending Korean text, multi-line text, long messages and emoji
 - Searching, opening and exporting in ordinary rooms (1:1 and group chats) (the test room is an open chat room, so its window title and search results may differ from ordinary rooms)
 - Behaviour when KakaoTalk is closed or shows the login screen
@@ -789,7 +789,7 @@ Yes. The development PC has an English display, and the kit's messages are alway
 
 **Q10. What happens when KakaoTalk is updated?**
 
-Only 26.9.0.5337 was verified (KakaoTalk on this PC later updated itself to 26.9.1.5339, where only one click and one paste have been tested). In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
+Only 26.9.0.5337 was verified (KakaoTalk on this PC later updated itself to 26.9.1.5339, where only clicking, pasting, opening a room and closing its window have been tested). In the future, other versions are planned to be allowed to read only, with sending locked (⏳ step 10). The kit does not interfere with KakaoTalk's own updates.
 
 **Q11. May I send messages to friends automatically?**
 
