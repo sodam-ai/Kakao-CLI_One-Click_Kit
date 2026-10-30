@@ -6,10 +6,10 @@ Add-Type -AssemblyName System.Runtime.WindowsRuntime
 # 검색 결과 영역과 첫 줄의 위치(창 크기에 대한 비율). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서 실제 화면 2장(결과 1줄, 여러 줄)을 읽어 확인한 값이다.
 # 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 행 간격은 약 0.139 다.
 # 가로: 왼쪽 메뉴(알림·설정 아이콘이 글자 0 으로 읽힘)는 0~0.17, 목록은 0.17 부터다. ListLeftMin 보다 왼쪽 글자는 결과가 아니다.
-# 방 이름 줄은 왼쪽에서 0.372 의 배지 아이콘(글자 한 개 0 으로 읽힘)으로 시작하고 이름 단어는 0.42 에서 시작한다(NameLeftMin~NameLeftMax). 이름 앞부분이 안 읽히면 이름 단어가 0.46 에서 시작하므로 그것으로 알아챈다.
-# 이름은 창 왼쪽 가장자리에서 일정한 픽셀(247)에 있으므로 창 폭이 바뀌면 같은 이름이 다른 비율에 놓인다. 그래서 창 크기가 측정한 값(RefWidth x RefHeight)에서
-# SizeTolerance 이상 벗어나면 판정하지 않는다(거짓). 허용 폭 안에서 247 픽셀이 놓이는 비율(0.414~0.426)이 NameLeftMin~NameLeftMax 안에 들어간다.
-# 아이콘 단어가 있으면 이름 단어는 아이콘 바로 뒤(IconGapMax, 창 폭의 비율)에서 시작해야 한다. 다른 조건(창 크기·배율·탭)에서는 다시 측정해야 한다.
+# 방 이름 줄은 왼쪽에서 0.372 의 배지 아이콘(글자 한 개 0 으로 읽힘)으로 시작하고 이름 단어는 0.42(픽셀 247)에서 시작한다. 이름 앞부분이 안 읽히면 이름 단어가 0.46 에서 시작하므로 그것으로 알아챈다.
+# 이름은 창 왼쪽 가장자리에서 일정한 픽셀(NameStartPx)에 있으므로 창 폭의 비율이 아니라 픽셀로 잰다(허용 오차 NameStartTolPx). 이름 시작 위치는 아이콘이 읽혔든 안 읽혔든 같은 좁은 범위여야 한다.
+# 아이콘 단어가 있으면 이름 단어는 아이콘 바로 뒤(IconGapMaxPx, 실측 약 5)에서 시작해야 한다. 픽셀 값은 배율 150%에서만 맞으므로 창 크기가 측정한 값(RefWidth x RefHeight)에서
+# SizeTolerance 이상 벗어나면 판정하지 않는다(거짓). 다른 조건(창 크기·배율·탭)에서는 다시 측정해야 한다.
 $script:ResultBand = @{
     RegionTop      = 0.25
     RegionBottom   = 0.79
@@ -17,9 +17,9 @@ $script:ResultBand = @{
     ListLeftMin    = 0.18
     TitleLeftMin   = 0.30
     TitleLeftMax   = 0.50
-    NameLeftMin    = 0.412
-    NameLeftMax    = 0.43
-    IconGapMax     = 0.02
+    NameStartPx    = 247
+    NameStartTolPx = 3
+    IconGapMaxPx   = 8
     RefWidth       = 588
     RefHeight      = 753
     SizeTolerance  = 0.015
@@ -147,15 +147,15 @@ function Test-RoomTitleText {
 }
 
 # 제목 줄의 단어 상자로 제목 글자를 만든다. 만들 수 없으면 $null(그러면 판정은 거짓이다).
-#  - 이름 시작 위치(NameLeftMin) 앞에 있는 단어는 배지 아이콘 칸이다. 글자 한 개짜리 단어 하나만 버린다(아이콘이 0·o 같은 글자로 읽힌다).
+#  - 이름 시작 위치(NameStartPx - NameStartTolPx) 앞에 있는 단어는 배지 아이콘 칸이다. 글자 한 개짜리 단어 하나만 버린다(아이콘이 0·o 같은 글자로 읽힌다).
 #    글자 내용으로 허용하는 것이 아니라 위치로 구분한다: 이름 안의 0 은 이름 시작 위치에 있다.
-#  - 남은 첫 단어는 이름 시작 위치(NameLeftMin~NameLeftMax) 안에서 시작해야 한다. 아니면 이름 앞부분이 안 읽힌 것(다른 방일 수 있다)이거나 다른 줄이다.
+#  - 남은 첫 단어는 이름 시작 위치(NameStartPx ± NameStartTolPx 픽셀) 안에서 시작해야 한다(아이콘이 읽혔든 아니든 같다). 아니면 이름 앞부분이 안 읽힌 것(다른 방일 수 있다)이거나 다른 줄이다.
 function Get-TitleTextFromWords {
     param([object[]]$Words = @(), [double]$ImageWidth)
     $sorted = @($Words | Where-Object { $null -ne $_ } | Sort-Object -Property Left)
     if ($sorted.Count -eq 0 -or $ImageWidth -le 0) { return $null }
-    $nameMin = $ImageWidth * $script:ResultBand.NameLeftMin
-    $nameMax = $ImageWidth * $script:ResultBand.NameLeftMax
+    $nameMin = $script:ResultBand.NameStartPx - $script:ResultBand.NameStartTolPx
+    $nameMax = $script:ResultBand.NameStartPx + $script:ResultBand.NameStartTolPx
     $nameWords = $sorted
     $iconRight = $null
     if ([double]$sorted[0].Left -lt $nameMin) {
@@ -167,7 +167,7 @@ function Get-TitleTextFromWords {
     $start = [double]$nameWords[0].Left
     if ($start -lt $nameMin -or $start -gt $nameMax) { return $null }
     # 아이콘이 있으면 이름은 그 바로 뒤에서 시작한다. 사이에 읽히지 않은 글자가 있으면 이름 앞부분이 빠진 것이다.
-    if ($null -ne $iconRight -and ($start - $iconRight) -gt ($ImageWidth * $script:ResultBand.IconGapMax)) { return $null }
+    if ($null -ne $iconRight -and ($start - $iconRight) -gt $script:ResultBand.IconGapMaxPx) { return $null }
     return (($nameWords | ForEach-Object { [string]$_.Text }) -join ' ')
 }
 

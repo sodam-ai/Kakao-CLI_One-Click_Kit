@@ -166,14 +166,33 @@ Describe 'Ocr: 실제 화면에서 본 배치(글자 상자 위치로 판정)' {
         Test-Single @($noIconPrefixDropped, $realTime, $realPrev1) | Should Be $false
     }
 
-    It 'refuses a name that starts only slightly too far right at any allowed window width (one thin character dropped, a gap after the icon, an icon far from the name)' {
-        $thinDropped = New-WordLine @(@('0', 219, 242), @('테스트방', 262, 333), @('1', 340, 346)) 216 239
-        $smallGap = New-WordLine @(@('0', 219, 242), @('테스트방', 255, 326), @('1', 333, 339)) 216 239
+    It 'accepts the name start only within 3 pixels of the measured 247, with or without an icon word, at every allowed window width' {
+        foreach ($width in 580, 588, 596) {
+            foreach ($start in 244, 247, 250) {
+                $withIcon = New-WordLine @(@('0', 219, 242), @('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                $noIcon = New-WordLine @(@('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                foreach ($line in $withIcon, $noIcon) {
+                    Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+                }
+            }
+            foreach ($start in 243, 251, 252, 254, 255, 262) {
+                $withIcon = New-WordLine @(@('0', 219, 242), @('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                $noIcon = New-WordLine @(@('테스트방', $start, ($start + 71)), @('1', ($start + 78), ($start + 84))) 216 239
+                foreach ($line in $withIcon, $noIcon) {
+                    Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+                }
+            }
+        }
+    }
+
+    It 'accepts at most 8 pixels between the icon word and the name (the measured gap is about 5), so an icon far from the name is refused' {
+        $gap8 = New-WordLine @(@('0', 219, 239), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        $gap9 = New-WordLine @(@('0', 219, 238), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
         $farIcon = New-WordLine @(@('0', 219, 226), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
         foreach ($width in 580, 588, 596) {
-            foreach ($line in $thinDropped, $smallGap, $farIcon) {
-                Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
-            }
+            Test-Single @($gap8, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+            Test-Single @($gap9, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+            Test-Single @($farIcon, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
             Test-Single @($realTitle, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
         }
     }
