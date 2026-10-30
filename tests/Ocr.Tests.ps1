@@ -85,9 +85,12 @@ Describe 'Ocr: Test-SingleResultLines (정확히 1건인가, 화면 없이 판�
         Test-Single @($searchBox, $row1Name, $row1Prev1, $row1Prev2) '테스트방' 0.60 | Should Be $false
     }
 
-    It 'refuses a window shape other than the measured one, but tolerates a small size difference' {
-        Test-Single @($searchBox, $row1Name, $row1Prev1) '테스트방' $ClickY 900 500 | Should Be $false
-        Test-Single @($searchBox, $row1Name, $row1Prev1) '테스트방' $ClickY 560 730 | Should Be $true
+    It 'refuses a window size other than the measured 588x753 (1.5% tolerance), at the edges of the tolerance and just outside it' {
+        $three = @($searchBox, $row1Name, $row1Prev1)
+        Test-Single $three '테스트방' $ClickY 900 500 | Should Be $false
+        Test-Single $three '테스트방' $ClickY 588 753 | Should Be $true
+        foreach ($size in @(580, 753), @(596, 753), @(588, 742), @(588, 764)) { Test-Single $three '테스트방' $ClickY $size[0] $size[1] | Should Be $true }
+        foreach ($size in @(579, 753), @(597, 753), @(588, 741), @(588, 765), @(560, 730), @(640, 753)) { Test-Single $three '테스트방' $ClickY $size[0] $size[1] | Should Be $false }
     }
 
     It 'is false (never throws) for no lines, a null list, an empty name, bad sizes or a bad click height' {
@@ -161,6 +164,18 @@ Describe 'Ocr: 실제 화면에서 본 배치(글자 상자 위치로 판정)' {
         Test-Single @($prefixDropped, $realTime, $realPrev1) | Should Be $false
         $noIconPrefixDropped = New-WordLine @(@('테스트방', 271, 342), @('1', 349, 355)) 216 239
         Test-Single @($noIconPrefixDropped, $realTime, $realPrev1) | Should Be $false
+    }
+
+    It 'refuses a name that starts only slightly too far right at any allowed window width (one thin character dropped, a gap after the icon, an icon far from the name)' {
+        $thinDropped = New-WordLine @(@('0', 219, 242), @('테스트방', 262, 333), @('1', 340, 346)) 216 239
+        $smallGap = New-WordLine @(@('0', 219, 242), @('테스트방', 255, 326), @('1', 333, 339)) 216 239
+        $farIcon = New-WordLine @(@('0', 219, 226), @('테스트방', 247, 318), @('1', 325, 331)) 216 239
+        foreach ($width in 580, 588, 596) {
+            foreach ($line in $thinDropped, $smallGap, $farIcon) {
+                Test-Single @($line, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $false
+            }
+            Test-Single @($realTitle, $realTime, $realPrev1) '테스트방' $ClickY $width $H | Should Be $true
+        }
     }
 
     It 'is false when something is glued to or in front of the name, so it is another room' {

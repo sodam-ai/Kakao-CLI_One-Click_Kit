@@ -7,7 +7,9 @@ Add-Type -AssemblyName System.Runtime.WindowsRuntime
 # 검색창 안의 글자(중심 약 0.21)와 아래쪽 광고(중심 약 0.86)는 영역 밖이고, 첫 줄은 중심 0.30~0.37 사이에 있다. 행 간격은 약 0.139 다.
 # 가로: 왼쪽 메뉴(알림·설정 아이콘이 글자 0 으로 읽힘)는 0~0.17, 목록은 0.17 부터다. ListLeftMin 보다 왼쪽 글자는 결과가 아니다.
 # 방 이름 줄은 왼쪽에서 0.372 의 배지 아이콘(글자 한 개 0 으로 읽힘)으로 시작하고 이름 단어는 0.42 에서 시작한다(NameLeftMin~NameLeftMax). 이름 앞부분이 안 읽히면 이름 단어가 0.46 에서 시작하므로 그것으로 알아챈다.
-# 창의 가로/세로 비율(588/753 = 0.78)이 AspectMin~AspectMax 를 벗어나면 이 비율들이 맞지 않으므로 판정하지 않는다(거짓). 다른 조건에서는 다시 측정해야 한다.
+# 이름은 창 왼쪽 가장자리에서 일정한 픽셀(247)에 있으므로 창 폭이 바뀌면 같은 이름이 다른 비율에 놓인다. 그래서 창 크기가 측정한 값(RefWidth x RefHeight)에서
+# SizeTolerance 이상 벗어나면 판정하지 않는다(거짓). 허용 폭 안에서 247 픽셀이 놓이는 비율(0.414~0.426)이 NameLeftMin~NameLeftMax 안에 들어간다.
+# 아이콘 단어가 있으면 이름 단어는 아이콘 바로 뒤(IconGapMax, 창 폭의 비율)에서 시작해야 한다. 다른 조건(창 크기·배율·탭)에서는 다시 측정해야 한다.
 $script:ResultBand = @{
     RegionTop      = 0.25
     RegionBottom   = 0.79
@@ -15,10 +17,12 @@ $script:ResultBand = @{
     ListLeftMin    = 0.18
     TitleLeftMin   = 0.30
     TitleLeftMax   = 0.50
-    NameLeftMin    = 0.41
-    NameLeftMax    = 0.435
-    AspectMin      = 0.70
-    AspectMax      = 0.86
+    NameLeftMin    = 0.412
+    NameLeftMax    = 0.43
+    IconGapMax     = 0.02
+    RefWidth       = 588
+    RefHeight      = 753
+    SizeTolerance  = 0.015
 }
 
 # 한국어 글자 읽기 엔진. 없으면 $null (이 PC 에 한국어 OCR 이 없는 경우).
@@ -153,19 +157,23 @@ function Get-TitleTextFromWords {
     $nameMin = $ImageWidth * $script:ResultBand.NameLeftMin
     $nameMax = $ImageWidth * $script:ResultBand.NameLeftMax
     $nameWords = $sorted
+    $iconRight = $null
     if ([double]$sorted[0].Left -lt $nameMin) {
         if (([string]$sorted[0].Text).Length -ne 1) { return $null }
         if ($sorted.Count -lt 2) { return $null }
+        $iconRight = [double]$sorted[0].Right
         $nameWords = @($sorted[1..($sorted.Count - 1)])
     }
     $start = [double]$nameWords[0].Left
     if ($start -lt $nameMin -or $start -gt $nameMax) { return $null }
+    # 아이콘이 있으면 이름은 그 바로 뒤에서 시작한다. 사이에 읽히지 않은 글자가 있으면 이름 앞부분이 빠진 것이다.
+    if ($null -ne $iconRight -and ($start - $iconRight) -gt ($ImageWidth * $script:ResultBand.IconGapMax)) { return $null }
     return (($nameWords | ForEach-Object { [string]$_.Text }) -join ' ')
 }
 
 # 읽은 줄들이 "기대한 방 하나뿐인 검색 결과"인지 판정한다(화면 없이 시험할 수 있는 순수 함수). 확인하지 못하면 항상 거짓이다.
 # 참(true)이 되려면 모두 맞아야 한다:
-#  ① 창 모양(가로/세로)이 측정한 모양과 비슷하다 ② 목록 칸(왼쪽 메뉴 제외)의 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓)
+#  ① 창 크기가 측정한 크기(588x753)에서 1.5% 안이다 ② 목록 칸(왼쪽 메뉴 제외)의 결과 영역 안의 모든 글자가 첫 줄의 높이 안에 있다(둘째 줄이 있으면 거짓)
 #  ③ 더블클릭할 높이(ClickRelY)가 첫 줄 안(이름 줄 맨 위 ~ 첫 줄 아래 끝)에 있다 ④ 방 이름 칸(왼쪽에서 0.30~0.50)에서 맨 위에 있는 줄 하나가
 #    방 이름 모양이다. 미리보기·시각 줄은 보지 않는다: 다른 방의 미리보기가 우연히 방 이름과 같아도 통과하지 못한다.
 #  ⑤ 줄에 단어 상자(Words)가 있으면 제목은 단어 위치로 만든다(Get-TitleTextFromWords). 단어 상자가 없는 줄은 줄 전체 글자가 이름이어야 한다.
@@ -173,8 +181,8 @@ function Test-SingleResultLines {
     param([object[]]$Lines = @(), [string]$ExpectedName, [double]$ImageWidth, [double]$ImageHeight, [double]$ClickRelY)
     if ([string]::IsNullOrWhiteSpace($ExpectedName) -or $ImageWidth -le 0 -or $ImageHeight -le 0) { return $false }
     if ($ClickRelY -le 0 -or $ClickRelY -ge 1) { return $false }
-    $aspect = $ImageWidth / $ImageHeight
-    if ($aspect -lt $script:ResultBand.AspectMin -or $aspect -gt $script:ResultBand.AspectMax) { return $false }
+    if ([Math]::Abs($ImageWidth - $script:ResultBand.RefWidth) / $script:ResultBand.RefWidth -gt $script:ResultBand.SizeTolerance) { return $false }
+    if ([Math]::Abs($ImageHeight - $script:ResultBand.RefHeight) / $script:ResultBand.RefHeight -gt $script:ResultBand.SizeTolerance) { return $false }
     $region = @()
     foreach ($line in @($Lines)) {
         if ($null -eq $line) { continue }
