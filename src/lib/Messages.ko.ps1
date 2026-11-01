@@ -58,6 +58,12 @@ $script:KitMessages = @{
     'parse.fileNotFound'   = '내보내기 파일을 찾을 수 없습니다: {0}'
     'parse.notExport'      = '카카오톡 내보내기 파일이 아닙니다: {0}'
     'error.configCorrupt'  = '설정 파일을 읽을 수 없습니다. 파일이 손상되었을 수 있습니다: {0}'
+    'export.notAllowed'    = '허용 목록에 없거나 읽기가 허용되지 않은 방이라 읽지 않았습니다: {0}'
+    'export.noExport'      = '저장된 내보내기 파일이 아직 없습니다. 먼저 대화를 내보내 주세요. (방: {0})'
+    'export.roomMismatch'  = '내보내기 파일의 방 이름이 등록된 방과 달라 저장하지 않았습니다. (방: {0})'
+    'export.storeFailed'   = '내보내기 파일을 보관하지 못했습니다. 폴더 권한이나 디스크 공간을 확인해 주세요.'
+    'export.optionInvalid' = '읽을 개수와 기간은 0보다 커야 합니다.'
+    'search.keywordEmpty'  = '검색할 낱말을 입력해 주세요.'
 }
 
 function Get-Msg {
