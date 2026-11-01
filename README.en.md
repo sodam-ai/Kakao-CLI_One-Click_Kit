@@ -9,7 +9,7 @@
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
-Document date: 2026-10-31 · Basis: steps 1-6 done + step 7 chat-room opening and on-screen text reading parts + mid-way verification · 262 automated tests · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
+Document date: 2026-11-02 · Basis: steps 1-6 done + step 7 chat-room opening and on-screen text reading parts + the parts of step 9 that do not touch KakaoTalk (keeping, reading, searching) + mid-way verification · 290 automated tests · License: Apache License 2.0 · Written so that people who are new to computers can follow it.
 
 - ✅ = works right now. ⏳ = does not work yet (planned).
 - In this document `kakao` is shorthand. You actually type `.\kakao.cmd`. The reason is in [Chapter 6](#run).
@@ -93,7 +93,7 @@ There is an open-source tool for macOS only (named kakaocli), but it works only 
 <a id="status"></a>
 ## 2. Current status: what works and what does not yet
 
-Development is split into 13 steps; steps 1-6 are finished and the parts of step 7 are built. In the table, "parts done" means **the parts (functions) for that feature are built and pass the automated tests, but they are not yet connected to a command that a user can call.**
+Development is split into 13 steps; steps 1-6 are finished, the parts of step 7 are built, and so are the parts of step 9 that do not touch KakaoTalk (keeping, reading, searching). In the table, "parts done" means **the parts (functions) for that feature are built and pass the automated tests, but they are not yet connected to a command that a user can call.**
 
 | Step | Content | Status |
 |---|---|---|
@@ -105,7 +105,7 @@ Development is split into 13 steps; steps 1-6 are finished and the parts of step
 | 6 | Reading export files (parser) | ✅ Parts done |
 | 7 | Opening a room | ⏳ Parts done; the connection to a command is not done yet. Checked in real KakaoTalk: judging with on-screen text reading whether the search result is exactly one room name (checked on a real screen and then fixed), and opening and closing a room (on a 100% monitor: double-click the first result → check the new window's title → close only the window the kit opened; passed once). Not done yet: the whole flow starting from clicking the search icon, selecting all in the search box (`Ctrl+A`), and a 150% monitor |
 | 8 | Sending a message | ⏳ Planned (built after step 9; a separate approval from the user is taken before starting) |
-| 9 | Export, read, search | ⏳ Planned (built before step 8) |
+| 9 | Export, read, search | ⏳ Some parts done (built before step 8). The parts for keeping export files (the 3 newest per room, 30 days), reading and searching passed their tests with fake files. Saving with `Ctrl+S` in KakaoTalk and the connection to a command are not done yet |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
 | 11 | Finished command router, numbered menu, `help` | ⏳ Planned |
 | 12 | First-run consent, update, uninstall | ⏳ Planned |
@@ -136,6 +136,7 @@ Development is split into 13 steps; steps 1-6 are finished and the parts of step
 - How to tell rooms apart when several rooms have the same name
 - False alarms of human-hand detection (did the person touch the keyboard or mouse; stopping although nobody touched anything) and whether the pressed-key check is too strict: the Hangul/English key is read as held down on this PC even with hands off, so it was left out of the pressed-key check (every other key is still checked). Whether that key is the only one with this problem on other keyboards and input methods has not been checked
 - How system messages ("○○ joined") appear in the export file: for now they may be read as continuation lines of the previous message.
+- The parts for keeping, reading and searching exports were tested only with synthetic fake chat files. They have never kept a real KakaoTalk export, and it is not known whether the first line of the file for 1:1 chats and "chat with myself" equals the room name (if it differs, the kit stops without keeping anything, for safety).
 - Static analysis tool (PSScriptAnalyzer): it is not installed, so it could not be run.
 - Reaction of antivirus software and SmartScreen
 - The automation-related clauses of Kakao's operating policy (the original text could not be checked, and a reply in the Kakao Developers forum said that automatic screen operation is prohibited: see 17.2)
@@ -362,12 +363,12 @@ KakaoTalk is a house without an official front door (API). So this kit places a 
 
 Why paste instead of typing: Korean text, emoji and long text then do not lose or change characters.
 
-### How reading a chat works (⏳ built in step 9, the parser is ✅)
+### How reading a chat works (⏳ built in step 9, the parser, keeping, reading and searching parts are ✅)
 
 1. Open the room and press `Ctrl+S`. KakaoTalk's "Save as" window appears.
 2. Always paste a new file name and press `Enter` to save (this prevents the overwrite question that appears when the same name exists).
 3. Read the saved file. The file looks like this: line 1 `<room name> 님과 카카오톡 대화`, line 2 `저장한 날짜 : YYYY-MM-DD HH:MM:SS`, the date divider `--------------- 2026년 10월 21일 수요일 ---------------`, and messages `[nickname] [오전 2:59] text`.
-4. Keeping: per room it keeps 1 latest copy and 3 earlier snapshots, and snapshots older than 30 days are deleted (⏳).
+4. Keeping: per room it keeps 1 latest copy (`latest.txt`) and the 3 newest snapshots, and snapshots older than 30 days are deleted (✅ parts, tested with fake files). If the room name on the first line of the file differs from the registered room, nothing is saved and the kit stops. Reading and searching look only at the latest copy, and an AI can read only rooms where AI reading is switched on. Exporting through the save window and the connection to a command are ⏳.
 
 ### How opening a room works (⏳ connected to a command in step 7, the parts below are ✅)
 
@@ -504,7 +505,8 @@ Open-KakaoRoom <room name>
 | `Ocr.ps1` | Decides, with on-screen text reading (OCR), whether the search result is only the room name. It reads the screen in memory only, writes nothing to disk and sends no input. | ✅ Parts (checked on a real screen and fixed, see chapter 14) |
 | `Room.ps1` | Opens only an allowed room, and only through the search; checks before opening that the result is exactly one row; counts it as success only when the opened window's title equals the room name letter for letter. It does not open when it cannot check. | ✅ Parts (one real open-and-close test passed; connection to a command is ⏳ step 7) |
 | `Send.ps1` | Sending messages | ⏳ step 8 |
-| `Export.ps1`, `Search.ps1` | Export, read, search | ⏳ step 9 |
+| `Export.ps1` | Keeps exported files per room (the 3 newest, snapshots older than 30 days deleted, the latest copy as `latest.txt`) and reads messages from the kept latest copy. It does not operate KakaoTalk. Exporting through the save window is ⏳. | ✅ Parts (partly, step 9) |
+| `Search.ps1` | Looks for a word in the kept latest copy, letter for letter (not as a pattern). It does not operate KakaoTalk. | ✅ Parts (step 9) |
 | `Status.ps1` | Reads the installed KakaoTalk version (cross-checking the registry against the running process) and decides whether it is a version that was actually tested. Read-only. The login check and the full status check are added in step 10. | ✅ Parts (minimal) |
 | `Menu.ps1` | Numbered menu | ⏳ step 11 |
 | `Install.ps1` | First run, update, uninstall | ⏳ step 12 |
@@ -624,6 +626,16 @@ The settings and records the kit creates are stored separately in your **user fo
 ## 14. Update summary (click to expand)
 
 Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The test counts are the number of automated tests that passed at that point.
+
+<details>
+<summary><strong>Part of step 9: the parts for keeping, reading and searching exports</strong> — tests 262 → 290</summary>
+
+- Only the part that does not touch KakaoTalk was built first: keeping exported files per room (the 3 newest, snapshots older than 30 days deleted, the latest copy as `latest.txt`), reading messages from the kept latest copy (`-Last`, `-Since`), and searching for a word (letter for letter, upper/lower case ignored).
+- Safety points: if the room name on the first line of the file differs from the registered room, nothing is saved (this stops another room's chat from being kept under this room's name and leaking through the AI reading permission). The keeping folder name is made by cleaning the room name and adding a hash, so a name like `..` cannot leave the keeping folder. Files that are not snapshots made by the kit are never deleted. Reading and searching follow the allowed list and each room's AI reading setting.
+- 28 tests were written first and seen to fail before the implementation; then 8 deliberate breakages of the code (switching off the room-name check, changing the number kept, switching off the 30-day cleanup, pattern search, switching off the read permission, dropping the hash from the folder name, ignoring the AI setting, deleting other files) were all caught by the tests.
+- Limits: tested only with synthetic fake chat files. Exporting a real file through KakaoTalk's `Ctrl+S` save window, the connection to a command, and checking a real export file are not done yet.
+
+</details>
 
 <details>
 <summary><strong>Full check of this guide</strong> — tests 261 → 262</summary>
@@ -873,6 +885,12 @@ These messages are also already in the code, but the matching commands are not c
 | `권한 이름이 올바르지 않습니다: <값>  (aiRead, aiSend, canSend 중 하나)` | The permission name is wrong. | Change it to one of `aiRead`, `aiSend` or `canSend`. |
 | `내보내기 파일을 찾을 수 없습니다: <파일 경로>` | The export file to read is not at that path. | Check the path and the file name. |
 | `카카오톡 내보내기 파일이 아닙니다: <파일 경로>` | The first line of the file is not in the KakaoTalk export format. | Specify a text file saved with KakaoTalk's chat export. |
+| `허용 목록에 없거나 읽기가 허용되지 않은 방이라 읽지 않았습니다: <방 이름>` | The room to read or search is not on the allowed list, reading is switched off, or an AI called and AI reading is switched off for that room. Nothing was read. | Check the room name. A person has to change the allowed list and permissions. |
+| `저장된 내보내기 파일이 아직 없습니다. 먼저 대화를 내보내 주세요. (방: <방 이름>)` | There is no exported file in that room's store. | Export the chat and keep it first. |
+| `내보내기 파일의 방 이름이 등록된 방과 달라 저장하지 않았습니다. (방: <방 이름>)` | The room name on the first line of the file is not letter for letter the registered room name. Nothing was saved, so that another room's chat is not kept under this room's name. | Check that it is the export file of the right room. If it keeps appearing for the same room, tell the developer. |
+| `내보내기 파일을 보관하지 못했습니다. 폴더 권한이나 디스크 공간을 확인해 주세요.` | The keeping folder could not be created or the file could not be copied. | Check the permissions and free disk space of the `%LOCALAPPDATA%\KakaoKit` folder. |
+| `읽을 개수와 기간은 0보다 커야 합니다.` | A value of 0 or less was given for the number or the period to read. | Change it to a value of 1 or more. |
+| `검색할 낱말을 입력해 주세요.` | The word to search for is empty or only blanks. | Write the word to look for. |
 | `화면 글자를 읽지 못했습니다.` | On-screen text reading did not finish within 15 seconds, or it failed. | Check that the KakaoTalk window is visible and run it again. |
 | `기록(로그)을 파일에 쓰지 못했습니다. 동작은 계속합니다.` | The record file could not be written, but the work went on (a warning). | Check the permissions and free disk space of the `%LOCALAPPDATA%\KakaoKit` folder. |
 
@@ -1088,7 +1106,8 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Ocr.Tests.ps1` | 47 | The window-size check and the reason a stop is explained (read-only), deciding whether the search result is only the room name (second row, search-box text, ad, longer names, digits glued to the name, another room's preview text, the name column, the click height, the window size, space differences), the real screen layout (the icon read as 0, left-menu text, a line with the front of the name missing, several rows), checking that the window is not covered, the fake-capture connection, the text-reading engine (including word boxes), no writing to disk and no input |
 | `Room.Tests.ps1` | 26 | Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source |
 | `Readme.Tests.ps1` | 29 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), that every on-screen message the kit can show is in the guide, the LICENSE text and owner |
-| **Total** | **262** | |
+| `Export.Tests.ps1` | 28 | Keeping, reading and searching exports: the per-room keeping folder name (cannot leave the folder), keeping the 3 newest and 30 days with protection of other files, refusing a file whose room name differs, the Korean message for a storage failure, `-Last` and `-Since`, the allowed list and AI reading permission, letter-for-letter search without duplicates |
+| **Total** | **290** | |
 
 ### Building the guide html
 
