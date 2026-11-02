@@ -5,7 +5,7 @@
 
 > **Current status: under development (6 of 13 steps done, step 7 in progress).**
 >
-> The only command you can really use right now is **`kakao version`**. Sending messages, reading chats, searching, saving and the numbered menu are **not built yet.** The part that opens a chat room (step 7) is built and tested but is not connected to a command yet. This document keeps "works now (✅)" and "planned (⏳)" apart from the first line to the last.
+> The only command you can really use right now is **`kakao version`**. Sending messages, reading chats, searching, saving and the numbered menu **cannot be used as commands yet.** The part that opens a chat room (step 7) and the parts that keep, read and search exported chat files (part of step 9) are built and tested (with fake data only) but are not connected to a command yet. The part that saves a chat from the KakaoTalk screen (`Ctrl+S`) is not built yet. This document keeps "works now (✅)" and "planned (⏳)" apart from the first line to the last.
 >
 > This is an **unofficial tool**. It has no relationship with the company that makes KakaoTalk (Kakao Corp.). You are responsible for how you use it. Please read [Chapter 17, Legal, copyright and license](#legal) before using it.
 
@@ -103,7 +103,7 @@ Development is split into 13 steps; steps 1-6 are finished, the parts of step 7 
 | 4 | Key input layer and safety device (the "gatekeeper") | ✅ Parts done (testing real input into KakaoTalk is ⏳) |
 | 5 | Saving and restoring the clipboard | ✅ Parts done |
 | 6 | Reading export files (parser) | ✅ Parts done |
-| 7 | Opening a room | ⏳ Parts done; the connection to a command is not done yet. Checked in real KakaoTalk: judging with on-screen text reading whether the search result is exactly one room name (checked on a real screen and then fixed), and opening and closing a room (on a 100% monitor: double-click the first result → check the new window's title → close only the window the kit opened; passed once). Not done yet: the whole flow starting from clicking the search icon, selecting all in the search box (`Ctrl+A`), and a 150% monitor |
+| 7 | Opening a room | ⏳ Parts done; the connection to a command is not done yet. Checked in real KakaoTalk: judging with on-screen text reading whether the search result is exactly one room name (checked on a real screen and then fixed), and opening and closing a room (on a 100% monitor: double-click the first result → check the new window's title → close only the window the kit opened; passed once). Not done yet: the whole flow starting from clicking the search icon, and selecting all in the search box (`Ctrl+A`). On a 150% monitor the window's scaling is misread as 100%, so room opening is currently refused (known defect, item 10 of 12.3) |
 | 8 | Sending a message | ⏳ Planned (built after step 9; a separate approval from the user is taken before starting) |
 | 9 | Export, read, search | ⏳ Some parts done (built before step 8). The parts for keeping export files (the 3 newest per room, 30 days), reading and searching passed their tests with fake files. Saving with `Ctrl+S` in KakaoTalk and the connection to a command are not done yet |
 | 10 | Status check, KakaoTalk version check, login guidance, lock for unverified versions | ⏳ Planned |
@@ -121,7 +121,7 @@ Development is split into 13 steps; steps 1-6 are finished, the parts of step 7 
 | PowerShell | Windows PowerShell 5.1 (5.1.26100.9711) |
 | KakaoTalk PC | 26.9.0.5337 (the only version confirmed in the research before development). KakaoTalk on this PC later updated itself to **26.9.1.5339**, where only clicking, pasting, opening a room and closing its window have been tested, and sending has not (it is not on the tested-version list) |
 | Display language | English (en-US). Even so, every message of the kit is in Korean. |
-| Monitors | 4 (including negative coordinates on a secondary monitor). Three are at 100% display scaling and the one below is at 150%. The same KakaoTalk window looks like 392x502 at 100% and 588x753 at 150%. The room-opening test was done on the 100% main monitor and not yet at 150% |
+| Monitors | 4 (including negative coordinates on a secondary monitor). Three are at 100% display scaling and the one below is at 150%. The same KakaoTalk window looks like 392x502 at 100% and 588x753 at 150%. The room-opening test was done only on the 100% main monitor. On the 150% monitor, a read-only check on 2026-11-02 found the window's scaling read as 100%, so room opening is currently refused there (item 10 of 12.3) |
 | Rights | No administrator rights (normal user) |
 | Default terminal | Windows Terminal |
 
@@ -129,7 +129,7 @@ Development is split into 13 steps; steps 1-6 are finished, the parts of step 7 
 
 - Testing, with the kit's own code, that keys really reach KakaoTalk: this is done in step 7. So far the only input the kit's code has sent is **a click, a paste (Ctrl+V), a double-click (opening a room) and a window-close request in the step 7 preliminary research and the room-opening test** (no message was sent. In the tests that passed, the safety guard did not stop; when a person touched the machine or the window size or monitor scaling differed from the reference, it really did stop before any input. See chapter 14). Other keys such as Enter and Ctrl+S, and sending messages and exporting, have never been tested with the kit's code. (In the research stage before development, sending, opening a room and exporting were confirmed with temporary experiments.)
 - Whether selecting all in the search box (`Ctrl+A`) works in the real KakaoTalk search box: it is in the room-opening part, but it has not been tested for real. The whole room-opening flow starting from clicking the search icon has not been tested in one go either (only the middle steps of opening and closing were tested).
-- With a display scaling of 125% or 200%: checked only with fake test data (the monitors of this PC are only at 100% and 150%). Really opening a room on the 150% monitor has not been tried yet.
+- With a display scaling of 125% or 200%: checked only with fake test data (the monitors of this PC are only at 100% and 150%). Really opening a room on the 150% monitor was not tried, but a read-only check confirmed that the current code refuses it (item 10 of 12.3).
 - Actually sending Korean text, multi-line text, long messages and emoji
 - Searching, opening and exporting in ordinary rooms (1:1 and group chats) (the test room is an open chat room, so its window title and search results may differ from ordinary rooms)
 - Behaviour when KakaoTalk is closed or shows the login screen
@@ -380,7 +380,7 @@ Why paste instead of typing: Korean text, emoji and long text then do not lose o
 6. It double-clicks the first result row once and waits up to 8 seconds for a new window. It counts as success only when the new window's title is word for word the room name.
 7. If the title differs, it closes that window and stops. It closes only the window the kit opened, and sends a single close request only to a window that belongs to KakaoTalk and whose title matches exactly.
 
-On-screen text reading looks at the screen in memory only (nothing is saved to disk). The size of the KakaoTalk window and the position of its text depend on the display scaling of the monitor the window sits on (the same window is 588x753 at 150% and 392x502 at 100%), so the pixel values used for the decision are recalculated for that scaling. If they do not match the reference, it stops on the side of not opening. Opening a room can show a "read" mark to the other person and cannot be undone, so not opening unless it is sure is this part's basic rule.
+On-screen text reading looks at the screen in memory only (nothing is saved to disk). The size of the KakaoTalk window and the position of its text depend on the display scaling of the monitor the window sits on (the same window is 588x753 at 150% and 392x502 at 100%), so the pixel values used for the decision are meant to be recalculated for that scaling. If they do not match the reference, it stops on the side of not opening. However, even when the KakaoTalk main window is on a 150% monitor, Windows reports its scaling as 100% (read-only check, 2026-11-02), so on a 150% monitor it currently judges "different from the reference" and stops (known defect, item 10 of 12.3). On the 100% monitor, opening and closing a room really passed. Opening a room can show a "read" mark to the other person and cannot be undone, so not opening unless it is sure is this part's basic rule.
 
 ### What the gatekeeper blocks
 
@@ -436,8 +436,9 @@ kakao read <room>
   4. paste a new file name -> Enter ........... ⏳ step 9
   5. wait until the file exists (max 10 s) .... ⏳ step 9
   6. read the file (parser) ................... part ✅ (ConvertFrom-KakaoExport)
-  7. tidy the stored copies (latest + 3) ...... ⏳
-  8. print to screen (JSON with --json) ....... ⏳
+  7. tidy the stored copies (latest + 3) ...... part ✅ (Update-ExportStore), command link ⏳
+  8. read from the stored copy ................ part ✅ (Read-KakaoRoom), command link ⏳
+  9. print to screen (JSON with --json) ....... ⏳
 ```
 
 ### D. The order in which the gatekeeper allows input (parts ✅, tested with fake parts)
@@ -481,9 +482,9 @@ Open-KakaoRoom <room name>
                                            |
       +----------+----------+--------------+---+-----------+
       v          v          v                  v           v
-   Config      Log      Guard+Win32          Clip        Parse      Status, Ocr, Room
-   settings    records  gatekeeper,          clipboard   reading     version check,
-   + allowed            input                            exports     text reading, opening rooms  (⏳ not yet: Send, Export, Search, Install, Menu)
+   Config      Log      Guard+Win32          Clip        Parse      Status, Ocr, Room, Export, Search
+   settings    records  gatekeeper,          clipboard   reading     version check, text reading, opening rooms,
+   + allowed            input                            exports     keep / read / search  (⏳ not yet: Send, Install, Menu)
       \________ Messages.ko (all Korean messages) · Paths · Errors ________/
                                            |
                   KakaoTalk PC app (windows, keyboard)  /  exported text files
@@ -552,7 +553,7 @@ Open-KakaoRoom <room name>
 | Message text to send | Typed by the user | Memory, the clipboard briefly, and KakaoTalk | To KakaoTalk (the intended send) | A mark asking to exclude it from clipboard history and cloud sync is attached. Whether every program obeys it was not checked. |
 | Original clipboard content | Text the user had copied | In memory only | No | It is restored after the work. It is not written to disk (checked by code search). |
 | Screen capture (to check before opening a room) | The kit reads the KakaoTalk window | In memory only (not saved) | No | A capture can show other rooms' names and previews, so the text it reads is not logged. Captures taken during development for a person to look at were approved one by one, deleted right after checking, and never uploaded to the repository (`.gitignore` excludes picture files). |
-| Exported chat files | KakaoTalk's official feature | `%LOCALAPPDATA%\KakaoKit\exports\` (⏳) | No | They contain other people's chats. 1 latest copy and 3 snapshots per room, deleted after 30 days. |
+| Exported chat files | KakaoTalk's official feature | `%LOCALAPPDATA%\KakaoKit\exports\<room folder>\` (keeping part ✅, not created at present; saving from KakaoTalk ⏳) | No | They contain other people's chats. 1 latest copy (`latest.txt`) and 3 snapshots per room, deleted after 30 days. |
 | Password | Not handled | Not stored | Not applicable | The user logs in directly in the KakaoTalk app. |
 
 The kit does not send chat content over the internet. However, **if you hand a chat you have read to an AI service, that content leaves the computer.** To guard against this, the "allow AI to read" switch for each room is off by default, and it is planned to tell you this and ask for consent when you turn it on (⏳).
@@ -568,6 +569,7 @@ The kit does not send chat content over the internet. However, **if you hand a c
 7. **A malicious program already running under the same account** cannot be stopped by this kit. This is a general limit.
 8. **A decision that leans on on-screen text reading**: the room-opening decision "the search result is exactly 1 row" leans on values measured with KakaoTalk 26.9.1.5339, the open-chat tab and the reference window size, and is affected by the accuracy of the Korean text-reading engine. It was built to stop on the side of not opening when the values differ or the text cannot be read, and the wrong room has never been opened on a real screen, but not every screen was checked. It must be checked again for ordinary rooms (1:1 and group chats) and for a screen where KakaoTalk has changed again.
 9. **Opening a room cannot be undone**: opening a room can show a "read" mark to the other person. So it opens only after checking the allowed room, exactly one search result and the matching window title, but even when the checks were right, there is no way to undo a read mark that has already appeared.
+10. **Opening a room stops on a 150% monitor (known defect, not fixed yet)**: in a read-only check on 2026-11-02 (no key or mouse input, no screen capture), when the KakaoTalk main window was on the 150% monitor its size was 588x753, but the window scaling Windows reported for it was 100% (another, smaller window of the same program was read as 150%). So the kit concludes "the size differs from the reference (392x502)" and does not open the room. This errs on the side of not opening, so it is safe, but the message shown says "monitor scaling 100%", which is misleading. This problem does not occur on the 100% monitor, where opening and closing a room really passed. The cause may be that the KakaoTalk main window does not follow per-monitor scaling, but this was not confirmed (unconfirmed). Fixing it means writing the test first and then reading the scaling of the monitor the window sits on; it has not been measured again since that record.
 
 <a id="files"></a>
 ## 13. Where files and documents are
@@ -619,7 +621,7 @@ The settings and records the kit creates are stored separately in your **user fo
 |---|---|---|
 | `config.json` | Allowed room list, permissions, consent time | Parts ✅ (not created for now) |
 | `logs\kakao.log` (and `.1`-`.3`) | Work record (no message text) | Parts ✅ (not created for now) |
-| `exports\` | Exported chat files | ⏳ step 9 |
+| `exports\` | Exported chat files (one folder per room) | keeping part ✅ (not created at present); saving from KakaoTalk ⏳ step 9 |
 | `manifest.json` | List of what the kit created (used when uninstalling) | ⏳ step 12 |
 
 <a id="changelog"></a>
@@ -662,7 +664,7 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 - The rules come down to one: **if it cannot check, it does not open.** A room that is not on the allowed list gets no input at all; without confirming that the search result is only the room name it does not double-click; and if the new window's title is not the room name letter for letter after opening, it closes that window and stops. A window that was already open is reused but never closed, and only a window the kit opened is closed. The result check looks at only the top line in the room-name column, so another room's preview text that equals the room name cannot pass; it also rejects another room whose name has digits glued right after it (for example a room named with an extra digit), and it does not open when the window is covered or when the window size or click height differs from the measured values.
 - On a PC without the Korean text reader it does not open by default. Only a person can allow "open without checking", and then a warning is recorded.
 - I wrote 38 tests first and confirmed all of them failed before implementing, and after pushing I added 8 more tests for the 4 gaps an automated security review pointed out and confirmed they failed before fixing them (22 for opening a room, 24 for text reading). All use fake parts and never touch real KakaoTalk.
-- Limits: the click positions and the result area come from screens of KakaoTalk 26.9.1.5339 with a 588x753 window (150% scaling) on the open-chat tab. Reading two real screens (one result, several results) with the text reader showed that the icon in front of the room name is read as the digit 0 and the left-menu icons are read as characters, so "exactly one result" was not judged correctly (an error on the safe side: the room is not opened). I changed the check to use the positions of the word boxes and added 19 tests (tests 230 → 249). The same KakaoTalk window shows a different pixel size depending on the monitor's scale setting (588x753 at 150%, 392x502 at 100%), so the check now converts its measured pixel values by the scale of the monitor the window is on. This scale conversion has been confirmed on real screens at 150% and 100%; other scales such as 125% and 200% have been checked only with test data. After the fix I re-read the real one-result screen once and it was judged "exactly one result" (the several-results screen was not captured again after the fix and was checked only with test data). The real room-opening and closing test passed once at 100% (one double-click on the first result row, the new window's title confirmed to equal the room name letter for letter, then closing only the window the kit opened, 7.4 s; the search-icon click and the paste steps were skipped because the screen was prepared in advance). It has not been run at 150% or through the whole flow that starts with the search-icon click.
+- Limits: the click positions and the result area come from screens of KakaoTalk 26.9.1.5339 with a 588x753 window (150% scaling) on the open-chat tab. Reading two real screens (one result, several results) with the text reader showed that the icon in front of the room name is read as the digit 0 and the left-menu icons are read as characters, so "exactly one result" was not judged correctly (an error on the safe side: the room is not opened). I changed the check to use the positions of the word boxes and added 19 tests (tests 230 → 249). The same KakaoTalk window shows a different pixel size depending on the monitor's scale setting (588x753 at 150%, 392x502 at 100%), so the check now converts its measured pixel values by the scale of the monitor the window is on. This scale conversion has been confirmed on real screens at 150% and 100%; other scales such as 125% and 200% have been checked only with test data (corrected 2026-11-02: what was confirmed at 150% was only that the window looks like 588x753; a defect was found later in which the value read for the window scaling on that monitor comes out as 100%, so room opening is refused on a 150% monitor, item 10 of 12.3). After the fix I re-read the real one-result screen once and it was judged "exactly one result" (the several-results screen was not captured again after the fix and was checked only with test data). The real room-opening and closing test passed once at 100% (one double-click on the first result row, the new window's title confirmed to equal the room name letter for letter, then closing only the window the kit opened, 7.4 s; the search-icon click and the paste steps were skipped because the screen was prepared in advance). It has not been run at 150% or through the whole flow that starts with the search-icon click.
 - So that the paste overwrites any text left in the search box from earlier, the kit now does **select all (Ctrl+A)** after clicking the search icon. It only selects (it does not delete or send anything), and its behavior in real KakaoTalk has not been tested yet. When opening a room stops, it also tells you why (the window size or monitor scale differs from the reference, or the window is covered). I wrote 8 tests first, confirmed they failed, and then implemented (tests 249 → 257).
 
 </details>
@@ -856,7 +858,7 @@ Every message below means the kit stopped. If it stopped after the double-click,
 | `같은 제목의 창이 둘 이상 있어 어느 창인지 알 수 없습니다. 아무것도 하지 않았습니다. (방: <방 이름>)` | Several windows have the same name, so it cannot tell which one is meant (it checks both before and after opening). | Close the duplicate windows so only one is left, and run it again. |
 | `화면 글자 읽기(OCR)를 쓸 수 없어 검색 결과가 정확히 1건인지 확인하지 못했습니다. 방을 열지 않았습니다.` | Korean text reading is not available, so the search result could not be checked. | Check that Windows has Korean text reading (Chapter 3). A person can allow "open without checking", but that is not recommended because another room might be opened. |
 | `검색 결과가 정확히 1건인지 확인하지 못해 방을 열지 않았습니다. (방: <방 이름>)<설명>` | The search result is not exactly one room name, or the screen differs from the reference, so it could not be checked. It did not double-click. The `<설명>` after it tells the cause, in one of the two ways below. If there is no explanation, other rows are mixed into the result or the screen layout (tab and so on) differs from the reference. | Act on the explanation and run it again. |
-| “카카오톡 창 크기가 기준과 다릅니다(지금 가로x세로, 모니터 배율 N%, 기준 가로x세로). 창 크기를 바꾸지 말고 원래 크기로 두거나, 창을 쓰던 모니터로 옮겨 주세요.” (the explanation after the message above) | The KakaoTalk window size was changed, or the window was moved to a monitor with different display scaling. | Do not touch the window size: keep the original size, or move the window back to the monitor it was used on. |
+| “카카오톡 창 크기가 기준과 다릅니다(지금 가로x세로, 모니터 배율 N%, 기준 가로x세로). 창 크기를 바꾸지 말고 원래 크기로 두거나, 창을 쓰던 모니터로 옮겨 주세요.” (the explanation after the message above) | The KakaoTalk window size was changed, or the window was moved to a monitor with different display scaling. On a 150% monitor this message appears even if you did not change the size, and the "monitor scaling 100%" in it is a misread value (item 10 of 12.3). | Do not touch the window size: keep the original size, or move the window back to the monitor it was used on. It has passed on the 100% monitor, so try it there (whether the size matches the reference right after moving from the 150% monitor to the 100% monitor was not checked). |
 | “카카오톡 창의 검색 결과 부분이 다른 창에 가려져 있습니다. 가리는 창을 치워 주세요.” (the explanation after the message above) | Another window covers the search-result area. | Move the covering window away and run it again. |
 | `방 창이 시간 안에 열리지 않았습니다. 아무 창도 닫지 않았습니다. (방: <방 이름>)` | The room window did not appear within 8 seconds after the double-click. | Check by yourself whether the room window appeared late. The room may already have been opened. |
 | `열린 창의 제목이 방 이름과 달라 그 창을 닫고 멈췄습니다. 더 입력하지 않았습니다.` | The window opened by the double-click was not the allowed room, so only that window was closed and it stopped. | Check that no other room has a similar name and that the search result is right. That room was already opened, so a read mark is likely to have appeared. |
@@ -979,7 +981,7 @@ Because without reading you cannot confirm that a sent message really went throu
 
 **Q20. Has opening a room been tested in real KakaoTalk?**
 
-Only in part. On a 100% screen, in a test room where I am alone, "double-click the first result → check the new window's title → close only the window the kit opened" passed (7.4 seconds). The whole flow starting from clicking the search icon, selecting all in the search box (`Ctrl+A`), a 150% monitor and ordinary rooms (1:1 and group chats) have not been tested yet. It is also not connected to a command yet, so you cannot call it yourself.
+Only in part. On a 100% screen, in a test room where I am alone, "double-click the first result → check the new window's title → close only the window the kit opened" passed (7.4 seconds). The whole flow starting from clicking the search icon, selecting all in the search box (`Ctrl+A`) and ordinary rooms (1:1 and group chats) have not been tested yet. On a 150% monitor I did not try opening a room, but a read-only check confirmed that the current code refuses it (item 10 of 12.3). It is also not connected to a command yet, so you cannot call it yourself.
 
 **Q21. Does on-screen text reading (OCR) save my screen or send it out?**
 
@@ -987,7 +989,7 @@ The kit does not. It reads the KakaoTalk window in memory only and writes nothin
 
 **Q22. Is it fine if I have several monitors or different display scaling?**
 
-Yes. Opening a room is judged according to the scaling of the monitor the KakaoTalk window sits on (this calculation was checked on 100% and 150% screens, and a room was really opened only at 100%), and if the window size differs from the reference it does not open and stops. Other scalings such as 125% and 200% were checked only with fake test data. If you move the window to a monitor with different scaling, or change its size, during the work, the safety device stops.
+On a 100% monitor, yes. On a 150% monitor, not yet. Opening a room is built to be judged according to the scaling of the monitor the KakaoTalk window sits on, and if the window size differs from the reference it does not open and stops. But on a 150% monitor the window's scaling is misread as 100%, so it currently stops there without opening (known defect, item 10 of 12.3). A room was really opened only at 100%. Other scalings such as 125% and 200% were checked only with fake test data. If you move the window to a monitor with different scaling, or change its size, during the work, the safety device stops.
 
 **Q23. Does the owner of this project use it commercially or give it to other people?**
 
