@@ -293,6 +293,30 @@ Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)
         $e | Should BeNullOrEmpty
         (Get-KitWindowScale -Hwnd 0) | Should Be 1
     }
+
+    # D-24: 카카오톡 창은 "시스템 DPI 인식"이라 150% 모니터에서도 창 DPI 가 96 으로 나온다(2026-11-10 실측). 화면에 보이는 크기는 모니터 배율을 따르므로 모니터 값을 우선한다.
+    It 'Select-KitDpi prefers the monitor DPI, because a system-aware window reports 96 on a 150% monitor (D-24)' {
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 | Should Be 144
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 144 | Should Be 144
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 96 | Should Be 96
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 96 | Should Be 96
+    }
+
+    It 'Select-KitDpi falls back to the window DPI and then to 96 when a value is unknown' {
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 0 | Should Be 144
+        Select-KitDpi -WindowDpi 0 -MonitorDpi 120 | Should Be 120
+        Select-KitDpi -WindowDpi 0 -MonitorDpi 0 | Should Be 96
+        Select-KitDpi -WindowDpi -1 -MonitorDpi -1 | Should Be 96
+    }
+
+    It 'Get-KitWindowScale answers a plausible scale (1.0 to 3.0) for every visible window on this PC' {
+        Enable-KitDpiAwareness
+        foreach ($h in [KakaoWin32]::TopLevelWindows()) {
+            if (-not [KakaoWin32]::IsVisible($h)) { continue }
+            $s = Get-KitWindowScale -Hwnd $h
+            ($s -ge 1.0 -and $s -le 3.0) | Should Be $true
+        }
+    }
 }
 
 Describe 'Ocr: 창 크기 확인과 멈춘 이유 (읽기만 하는 도우미)' {
