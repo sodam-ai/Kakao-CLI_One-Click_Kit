@@ -464,7 +464,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>On-screen text reading looks at the screen in memory only (nothing is saved to disk). The size of the KakaoTalk window and the position of its text depend on the display scaling of the monitor the window sits on (the same window is 588x753 at 150% and 392x502 at 100%), so the pixel values used for the decision are meant to be recalculated for that scaling. If they do not match the reference, it stops on the side of not opening. However, even when the KakaoTalk main window is on a 150% monitor, the window's own scaling value comes out as 100% (read-only check, 2026-11-02), so there was a defect where it judged "different from the reference" and stopped on that monitor; it was fixed on 2026-11-11 by reading the scaling of the monitor the window sits on (item 10 of 12.3). On the 100% monitor, opening and closing a room really passed. Opening a room can show a "read" mark to the other person and cannot be undone, so not opening unless it is sure is this part's basic rule.</p>
 <h3>What the gatekeeper blocks</h3>
 <ul>
-<li>No key other than the 5 allowed keys (<code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code>, <code>Enter</code>) is ever sent.
+<li>No key other than the 6 allowed keys (<code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code>, <code>Ctrl+F</code>, <code>Enter</code>) is ever sent.
 </li>
 <li><code>Esc</code> is never sent. In KakaoTalk <code>Esc</code> closes the chat window (a mistake that really happened).
 </li>
@@ -589,7 +589,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tbody>
 <tr><td>Only allowed rooms</td><td>The room name must match character for character (case, spaces and invisible characters are all distinguished). Two rooms with the same name are refused.</td><td>✅ Tested</td></tr>
 <tr><td>Gatekeeper right before input</td><td>Owned by KakaoTalk, exact title match, window in front, no human hands, no key held down (only the Hangul/English key is exempt). If any one is wrong, 0 inputs.</td><td>✅ Tested with fake parts (real KakaoTalk is ⏳)</td></tr>
-<tr><td>5 allowed keys, no Esc</td><td>The same allowed table exists on both sides of the code (PowerShell, C#), and a test checks that there is no Esc code.</td><td>✅</td></tr>
+<tr><td>6 allowed keys, no Esc</td><td>The same allowed table exists on both sides of the code (PowerShell, C#), and a test checks that there is no Esc code.</td><td>✅</td></tr>
 <tr><td>Human-hand detection</td><td>Waits until idle before starting, and stops if human input is detected during the work.</td><td>✅ (checking false alarms is ⏳)</td></tr>
 <tr><td>No running twice at once</td><td>A named lock (<code>Local\KakaoKit.InputLock</code>)</td><td>✅</td></tr>
 <tr><td>Clipboard protection</td><td>Only text is saved and restored, a job stops if there is an image or file, and it is checked after putting text in and after restoring.</td><td>✅</td></tr>
@@ -959,7 +959,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tbody>
 <tr><td><code>대상 창 제목이 정해지지 않아 입력하지 않았습니다.</code></td><td>There was no window title to check before input (program error). No input was made.</td><td>Tell the developer.</td></tr>
 <tr><td><code>작업을 시작하기 전 확인(키보드·마우스에서 손 떼기)이 먼저 필요합니다. 입력하지 않았습니다.</code></td><td>It tried to send input without the hands-off check (program error). No input was made.</td><td>Tell the developer.</td></tr>
-<tr><td><code>허용되지 않은 키라서 보내지 않았습니다: &lt;키 이름&gt;</code></td><td>It tried to send a key that is not among the 5 allowed keys (program error). It was not sent.</td><td>Tell the developer.</td></tr>
+<tr><td><code>허용되지 않은 키라서 보내지 않았습니다: &lt;키 이름&gt;</code></td><td>It tried to send a key that is not among the 6 allowed keys (program error). It was not sent.</td><td>Tell the developer.</td></tr>
 <tr><td><code>허용되지 않은 키 조합이라 보내지 않았습니다.</code></td><td>The input layer (C#) checked once more and blocked it (program error).</td><td>Tell the developer.</td></tr>
 <tr><td><code>마우스 위치가 바뀌어 클릭하지 않았습니다.</code></td><td>The mouse moved after the check and before the click. It did not click.</td><td>Take your hand off the mouse and run it again.</td></tr>
 <tr><td><code>입력을 보내지 못했습니다.</code></td><td>Windows did not accept the key or mouse input.</td><td>Put the KakaoTalk window in front and run it once more. If the same message keeps appearing, tell the developer.</td></tr>
@@ -1147,7 +1147,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Bootstrap.Tests.ps1</code></td><td>24</td><td>Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, <code>시작.bat</code> working with special characters in the folder name, <code>.gitignore</code> entries, behaviour of <code>version</code> and of an unknown command, no pointer to a <code>help</code> command that does not exist, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not</td></tr>
 <tr><td><code>Config.Tests.ps1</code></td><td>30</td><td>Allowed list, permissions, only a person may change, consent, strange hand-edited settings</td></tr>
 <tr><td><code>Log.Tests.ps1</code></td><td>11</td><td>Records without message text, tidying the record file, error report</td></tr>
-<tr><td><code>Guard.Tests.ps1</code></td><td>43</td><td>The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent)</td></tr>
+<tr><td><code>Guard.Tests.ps1</code></td><td>44</td><td>The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent)</td></tr>
 <tr><td><code>Clip.Tests.ps1</code></td><td>9</td><td>Saving, replacing and restoring the clipboard, stopping on an image or file</td></tr>
 <tr><td><code>Parse.Tests.ps1</code></td><td>20</td><td>Reading export files, strange dates and times, line-end differences</td></tr>
 <tr><td><code>Status.Tests.ps1</code></td><td>23</td><td>Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests</td></tr>
@@ -1155,7 +1155,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Room.Tests.ps1</code></td><td>28</td><td>Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the tab check before the first click (no click or key unless it is the open-chat tab), the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source</td></tr>
 <tr><td><code>Readme.Tests.ps1</code></td><td>29</td><td>The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), that every on-screen message the kit can show is in the guide, the LICENSE text and owner</td></tr>
 <tr><td><code>Export.Tests.ps1</code></td><td>28</td><td>Keeping, reading and searching exports: the per-room keeping folder name (cannot leave the folder), keeping the 3 newest and 30 days with protection of other files, refusing a file whose room name differs, the Korean message for a storage failure, <code>-Last</code> and <code>-Since</code>, the allowed list and AI reading permission, letter-for-letter search without duplicates</td></tr>
-<tr><td><strong>Total</strong></td><td><strong>305</strong></td><td></td></tr>
+<tr><td><strong>Total</strong></td><td><strong>306</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>Building the guide html</h3>
 <p>The sources of the guide are <code>README.md</code> and <code>README.en.md</code>. The html is made with the tool below and must not be edited by hand.</p>
@@ -1182,7 +1182,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Build-Readme.ps1 -Chec
 </li>
 <li>The first statement of every function that contains <code>throw</code> is <code>$ErrorActionPreference = 'Stop'</code> (so that the caller's error setting cannot cause the safety device to be ignored).
 </li>
-<li>The allowed keys are only <code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code> and <code>Enter</code>, and there must be no <code>Esc</code> code.
+<li>The allowed keys are only <code>Ctrl+S</code>, <code>Ctrl+V</code>, <code>Ctrl+A</code>, <code>Ctrl+C</code>, <code>Ctrl+F</code> and <code>Enter</code>, and there must be no <code>Esc</code> code.
 </li>
 <li>The switch that turns on tests operating the real KakaoTalk is the environment variable <code>KAKAO_E2E=1</code>, but no automated test uses it yet. The real tests so far were each run separately when the user said to start, and the test room is only a room where I am alone (from step 7).
 </li>

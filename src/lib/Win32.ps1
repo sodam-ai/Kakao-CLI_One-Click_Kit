@@ -49,7 +49,7 @@ public static class KakaoWin32 {
     // 입력 결과 코드: 0 성공, 1 카카오톡 창 아님, 2 제목 다름, 3 맨 앞 아님, 4 사람 손 감지(또는 기준 없음), 5 다른 키 눌림,
     // 6 허용되지 않은 키 조합, 7 클릭 자리가 다른 창에 가림, 8 마우스 위치가 바뀜, 9 입력 전달 실패, 10 잘못된 인자
     static readonly byte[][] AllowedCombos = new byte[][] {
-        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x41 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x0D }
+        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x41 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x11, 0x46 }, new byte[] { 0x0D }
     };
 
     public static long[] TopLevelWindows() {

@@ -384,7 +384,7 @@ On-screen text reading looks at the screen in memory only (nothing is saved to d
 
 ### What the gatekeeper blocks
 
-- No key other than the 5 allowed keys (`Ctrl+S`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C`, `Enter`) is ever sent.
+- No key other than the 6 allowed keys (`Ctrl+S`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C`, `Ctrl+F`, `Enter`) is ever sent.
 - `Esc` is never sent. In KakaoTalk `Esc` closes the chat window (a mistake that really happened).
 - The ≡ menu at the top right of the window is never clicked. Inside it, "Delete all chat content" and "Leave chat room" sit right next to each other.
 - "Check" and "input" are bundled into one action, so there is no gap between checking and typing in which the window could change.
@@ -529,7 +529,7 @@ Open-KakaoRoom <room name>
 |---|---|---|
 | Only allowed rooms | The room name must match character for character (case, spaces and invisible characters are all distinguished). Two rooms with the same name are refused. | ✅ Tested |
 | Gatekeeper right before input | Owned by KakaoTalk, exact title match, window in front, no human hands, no key held down (only the Hangul/English key is exempt). If any one is wrong, 0 inputs. | ✅ Tested with fake parts (real KakaoTalk is ⏳) |
-| 5 allowed keys, no Esc | The same allowed table exists on both sides of the code (PowerShell, C#), and a test checks that there is no Esc code. | ✅ |
+| 6 allowed keys, no Esc | The same allowed table exists on both sides of the code (PowerShell, C#), and a test checks that there is no Esc code. | ✅ |
 | Human-hand detection | Waits until idle before starting, and stops if human input is detected during the work. | ✅ (checking false alarms is ⏳) |
 | No running twice at once | A named lock (`Local\KakaoKit.InputLock`) | ✅ |
 | Clipboard protection | Only text is saved and restored, a job stops if there is an image or file, and it is checked after putting text in and after restoring. | ✅ |
@@ -876,7 +876,7 @@ These messages are also already in the code, but the matching commands are not c
 |---|---|---|
 | `대상 창 제목이 정해지지 않아 입력하지 않았습니다.` | There was no window title to check before input (program error). No input was made. | Tell the developer. |
 | `작업을 시작하기 전 확인(키보드·마우스에서 손 떼기)이 먼저 필요합니다. 입력하지 않았습니다.` | It tried to send input without the hands-off check (program error). No input was made. | Tell the developer. |
-| `허용되지 않은 키라서 보내지 않았습니다: <키 이름>` | It tried to send a key that is not among the 5 allowed keys (program error). It was not sent. | Tell the developer. |
+| `허용되지 않은 키라서 보내지 않았습니다: <키 이름>` | It tried to send a key that is not among the 6 allowed keys (program error). It was not sent. | Tell the developer. |
 | `허용되지 않은 키 조합이라 보내지 않았습니다.` | The input layer (C#) checked once more and blocked it (program error). | Tell the developer. |
 | `마우스 위치가 바뀌어 클릭하지 않았습니다.` | The mouse moved after the check and before the click. It did not click. | Take your hand off the mouse and run it again. |
 | `입력을 보내지 못했습니다.` | Windows did not accept the key or mouse input. | Put the KakaoTalk window in front and run it once more. If the same message keeps appearing, tell the developer. |
@@ -1105,7 +1105,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Bootstrap.Tests.ps1` | 24 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command, no pointer to a `help` command that does not exist, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
-| `Guard.Tests.ps1` | 43 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
+| `Guard.Tests.ps1` | 44 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
@@ -1113,7 +1113,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Room.Tests.ps1` | 28 | Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the tab check before the first click (no click or key unless it is the open-chat tab), the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source |
 | `Readme.Tests.ps1` | 29 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), that every on-screen message the kit can show is in the guide, the LICENSE text and owner |
 | `Export.Tests.ps1` | 28 | Keeping, reading and searching exports: the per-room keeping folder name (cannot leave the folder), keeping the 3 newest and 30 days with protection of other files, refusing a file whose room name differs, the Korean message for a storage failure, `-Last` and `-Since`, the allowed list and AI reading permission, letter-for-letter search without duplicates |
-| **Total** | **305** | |
+| **Total** | **306** | |
 
 ### Building the guide html
 
@@ -1142,7 +1142,7 @@ There is **no** build step that compiles or bundles. The script files are run as
 
 - `.ps1` is UTF-8 with BOM, and `.bat` and `.cmd` are without BOM + CRLF. After writing a file, repair it with `tools\Write-Bom.ps1 -All`.
 - The first statement of every function that contains `throw` is `$ErrorActionPreference = 'Stop'` (so that the caller's error setting cannot cause the safety device to be ignored).
-- The allowed keys are only `Ctrl+S`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C` and `Enter`, and there must be no `Esc` code.
+- The allowed keys are only `Ctrl+S`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C`, `Ctrl+F` and `Enter`, and there must be no `Esc` code.
 - The switch that turns on tests operating the real KakaoTalk is the environment variable `KAKAO_E2E=1`, but no automated test uses it yet. The real tests so far were each run separately when the user said to start, and the test room is only a room where I am alone (from step 7).
 - Static analysis (PSScriptAnalyzer) is not installed, so it could not be run.
 

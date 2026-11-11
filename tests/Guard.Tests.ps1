@@ -106,7 +106,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'sends each whitelisted combo as ONE native call (Ctrl+key, or Enter)' {
-        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+A' = '11,41'; 'Ctrl+C' = '11,43'; 'Enter' = '0D' }
+        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+A' = '11,41'; 'Ctrl+C' = '11,43'; 'Ctrl+F' = '11,46'; 'Enter' = '0D' }
         foreach ($combo in $expected.Keys) {
             $f = New-FakeProvider
             Initialize-Guard $f
@@ -116,7 +116,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'refuses every key outside the whitelist before touching anything (Esc closes the chat window)' {
-        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'Ctrl+S ', 'F5', '') {
+        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'ctrl+f', 'Ctrl+Shift+F', 'Ctrl+S ', 'F5', '') {
             $f = New-FakeProvider
             Initialize-Guard $f
             $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys $bad -ExpectedTitle '비밀방' -Provider $f.Provider }
@@ -433,6 +433,12 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
         foreach ($combo in @(27), @(0x11, 0x57), @(0x12, 0x73), @(0x2E), @(0x11, 0x10, 0x53), @(0x11, 0x53, 0x0D), @()) {
             [KakaoWin32]::SendCombo(0, 'x', [byte[]]$combo, 0) | Should Be 6
         }
+    }
+
+    It 'the native layer allows Ctrl+F (it gets past the key table and stops at the window check, status 1) and still refuses Ctrl+Shift+F' {
+        # 입력을 보내지 않는다: 창 번호 0 은 카카오톡 창이 아니라서 허용 표를 통과한 뒤 1 에서 멈춘다.
+        [KakaoWin32]::SendCombo(0, 'x', [byte[]](0x11, 0x46), 0) | Should Be 1
+        [KakaoWin32]::SendCombo(0, 'x', [byte[]](0x11, 0x10, 0x46), 0) | Should Be 6
     }
 
     It 'the native layer refuses a window that is not KakaoTalk (status 1) and bad click counts (status 10)' {
