@@ -106,7 +106,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'sends each whitelisted combo as ONE native call (Ctrl+key, or Enter)' {
-        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+A' = '11,41'; 'Ctrl+C' = '11,43'; 'Ctrl+F' = '11,46'; 'Enter' = '0D' }
+        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+C' = '11,43'; 'Ctrl+F' = '11,46'; 'Enter' = '0D' }
         foreach ($combo in $expected.Keys) {
             $f = New-FakeProvider
             Initialize-Guard $f
@@ -116,7 +116,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'refuses every key outside the whitelist before touching anything (Esc closes the chat window)' {
-        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'ctrl+f', 'Ctrl+Shift+F', 'Ctrl+S ', 'F5', '') {
+        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'ctrl+f', 'Ctrl+A', 'Ctrl+Shift+F', 'Ctrl+S ', 'F5', '') {
             $f = New-FakeProvider
             Initialize-Guard $f
             $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys $bad -ExpectedTitle '비밀방' -Provider $f.Provider }
@@ -283,7 +283,7 @@ Describe 'Guard: 사용자 간섭' {
     It 'lets two kit inputs follow each other when nobody else touched anything' {
         $f = New-FakeProvider
         Initialize-Guard $f
-        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+A' -ExpectedTitle '비밀방' -Provider $f.Provider
+        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+S' -ExpectedTitle '비밀방' -Provider $f.Provider
         Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+C' -ExpectedTitle '비밀방' -Provider $f.Provider
         (Get-InputCalls $f).Count | Should Be 2
     }
@@ -291,7 +291,7 @@ Describe 'Guard: 사용자 간섭' {
     It 'stops the second input when the user touched something between two kit inputs' {
         $f = New-FakeProvider
         Initialize-Guard $f
-        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+A' -ExpectedTitle '비밀방' -Provider $f.Provider
+        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+S' -ExpectedTitle '비밀방' -Provider $f.Provider
         (Get-InputCalls $f).Count | Should Be 1
         $f.Tick = 2500
         $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+C' -ExpectedTitle '비밀방' -Provider $f.Provider }
@@ -430,7 +430,8 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
 
     It 'the native layer refuses Esc, Alt+F4, Delete, Ctrl+W and Shift combos by itself (status 6)' {
         # 이 시험은 입력을 보내지 않는다: 허용 표에 없으면 창을 확인하기도 전에 6을 돌려준다.
-        foreach ($combo in @(27), @(0x11, 0x57), @(0x12, 0x73), @(0x2E), @(0x11, 0x10, 0x53), @(0x11, 0x53, 0x0D), @()) {
+        # Ctrl+A(0x11, 0x41)는 카카오톡 메인 창에서 "친구 추가" 단축키라서 막는다(2026-11-12 화면에서 확인).
+        foreach ($combo in @(27), @(0x11, 0x57), @(0x11, 0x41), @(0x12, 0x73), @(0x2E), @(0x11, 0x10, 0x53), @(0x11, 0x53, 0x0D), @()) {
             [KakaoWin32]::SendCombo(0, 'x', [byte[]]$combo, 0) | Should Be 6
         }
     }

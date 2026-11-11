@@ -25,8 +25,6 @@ function Get-DefaultRoomProvider {
             else { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -ExpectedTitle $title } }
         # 검색을 Ctrl+F 로 연다(좌표 클릭 없음). 오픈채팅 화면에서 검색창이 열리는 것을 2026-11-12 에 실제로 확인했다(다른 탭은 미확인).
         OpenSearch     = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+F' -ExpectedTitle $title }
-        # 검색창에 남은 글자를 붙여넣기가 덮어쓰도록 전체 선택(Ctrl+A)을 한다. 선택만 하고 지우거나 보내지 않는다.
-        SelectAll      = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+A' -ExpectedTitle $title }
         PasteText      = { param($hwnd, $text, $title)
             Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title }.GetNewClosure() }
         # 결과를 확인하지 못했을 때 사용자에게 원인(창 크기·배율·가려짐)을 알려 주기 위해 창 상태를 읽는다. 읽기만 하고 입력하지 않는다.
@@ -92,8 +90,8 @@ function Open-KakaoRoom {
     $rowY = $script:RoomAnchors.FirstResultRow[1]
     & $Provider.WaitIdle
     & $Provider.OpenSearch $main $mainTitle
-    # 검색창에 이전에 넣은 글자가 남아 있어도 붙여넣기가 덮어쓰도록 전체 선택을 먼저 한다(실제 카카오톡에서의 동작은 시험으로 확인한다).
-    & $Provider.SelectAll $main $mainTitle
+    # 전체 선택(Ctrl+A)은 하지 않는다: 카카오톡 메인 창에서 Ctrl+A 는 "친구 추가" 창을 연다(2026-11-12 확인).
+    # 검색창에 이전 글자가 남아 있으면 붙여넣은 글과 섞여 결과가 1건이 아니게 되고, 아래 확인에서 더블클릭 없이 멈춘다(fail-closed).
     & $Provider.PasteText $main $title $mainTitle
     & $Provider.Sleep $script:RoomResultRenderMs
     # 더블클릭 직전의 관문: 결과가 정확히 1건이 아니거나 확인 중 오류가 나면 더블클릭하지 않는다.

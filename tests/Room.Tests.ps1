@@ -11,7 +11,6 @@ function New-FakeRoomProvider {
         OcrAvailable = $true
         ResultSingle = $true
         ResultThrows = $false
-        SelectAllThrows = $false
         Hint         = ''
         TabOpenChat  = $true
     }
@@ -19,7 +18,6 @@ function New-FakeRoomProvider {
         Windows        = { [void]$s.Calls.Add('Windows'); if ($s.WindowsQueue.Count -gt 0) { $s.Last = @($s.WindowsQueue.Dequeue()) }; $s.Last }.GetNewClosure()
         WaitIdle       = { [void]$s.Calls.Add('WaitIdle') }.GetNewClosure()
         Click          = { param($hwnd, $relX, $relY, $double, $title) [void]$s.Calls.Add(('Click:{0}:{1},{2}:{3}:{4}' -f $hwnd, $relX, $relY, $double, $title)) }.GetNewClosure()
-        SelectAll      = { param($hwnd, $title) [void]$s.Calls.Add(('SelectAll:{0}:{1}' -f $hwnd, $title)); if ($s.SelectAllThrows) { throw 'select broke' } }.GetNewClosure()
         Explain        = { param($hwnd) [void]$s.Calls.Add('Explain'); $s.Hint }.GetNewClosure()
         PasteText      = { param($hwnd, $text, $title) [void]$s.Calls.Add(('Paste:{0}:{1}:{2}' -f $hwnd, $text, $title)) }.GetNewClosure()
         OpenSearch     = { param($hwnd, $title) [void]$s.Calls.Add(('OpenSearch:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
@@ -36,7 +34,7 @@ function New-Win([long]$Hwnd, [string]$Title) { [pscustomobject]@{ Hwnd = $Hwnd;
 function Set-TestRooms([object[]]$Rooms) { Save-KitConfig -Config ([pscustomobject]@{ version = 1; consentAcceptedAt = $null; lastRoom = $null; rooms = $Rooms }) }
 function New-TestRoom([string]$Name, [bool]$AiRead = $false) { [pscustomobject]@{ name = $Name; type = 'open'; verified = $true; canRead = $true; canSend = $true; selfOnly = $true; aiRead = $AiRead; aiSend = $false } }
 # 키·마우스·창 닫기처럼 "실제로 입력되는" 호출만 센다.
-function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Click:*' -or $_ -like 'OpenSearch:*' -or $_ -like 'SelectAll:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
+function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Click:*' -or $_ -like 'OpenSearch:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
 
 $MainWin = New-Win 10 '카카오톡'
 
@@ -247,33 +245,16 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
         }
     }
 
-    It 'selects the whole search box between opening the search (Ctrl+F) and the paste, so leftover text is replaced instead of appended' {
+    It 'pastes right after opening the search (Ctrl+F) and sends no select-all: Ctrl+A is the add-friend shortcut in the KakaoTalk main window' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
             $f = New-OpenScenario
             $null = Open-KakaoRoom -Name '테스트방' -Provider $f.Provider
-            $select = @($f.Calls | Where-Object { $_ -like 'SelectAll:*' })
-            $select.Count | Should Be 1
-            $select[0] | Should Be 'SelectAll:10:카카오톡'
-            $iIcon = $f.Calls.IndexOf('OpenSearch:10:카카오톡')
-            $iSelect = $f.Calls.IndexOf($select[0])
+            @($f.Calls | Where-Object { $_ -like 'SelectAll*' }).Count | Should Be 0
+            $iOpen = $f.Calls.IndexOf('OpenSearch:10:카카오톡')
             $iPaste = $f.Calls.IndexOf('Paste:10:테스트방:카카오톡')
-            $iIcon | Should BeLessThan $iSelect
-            $iSelect | Should BeLessThan $iPaste
-        }
-    }
-
-    It 'never pastes or double-clicks when the select-all step fails (only Ctrl+F was sent)' {
-        Use-TempHome {
-            Set-TestRooms @((New-TestRoom '테스트방'))
-            $f = New-FakeRoomProvider
-            $f.SelectAllThrows = $true
-            $f.WindowsQueue.Enqueue(@($MainWin))
-            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
-            $e.Message | Should Be 'select broke'
-            @($f.Calls | Where-Object { $_ -like 'Paste:*' }).Count | Should Be 0
-            @($f.Calls | Where-Object { $_ -like 'Click:*' }).Count | Should Be 0
-            @($f.Calls | Where-Object { $_ -like 'OpenSearch:*' }).Count | Should Be 1
+            $iOpen | Should BeLessThan $iPaste
+            $iOpen | Should BeGreaterThan -1
         }
     }
 
@@ -414,14 +395,37 @@ Describe 'Room: Close-KitOpenedWindow' {
     }
 }
 
+Describe 'Room: 기본 제공자는 라이브러리를 스크립트 범위로 불러온 환경에서도 동작한다' {
+    It 'PasteText finds Send-KeyCombo when the libraries are dot-sourced inside a script file (a closure cannot see script-scope functions)' {
+        # 실제 사고: 스크립트 파일 안에서 라이브러리를 불러오면 함수가 스크립트 범위에 생긴다. .GetNewClosure() 로 만든 블록은 전역만 보여서
+        # Send-KeyCombo 를 못 찾는다(S5 에서 Ctrl+F·Ctrl+A 뒤 붙여넣기에서 멈춤). 시험은 키 전송과 클립보드를 가짜로 바꿔 입력 없이 확인한다.
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('room-scope-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        $body = @"
+`$ErrorActionPreference = 'Stop'
+foreach (`$n in 'Messages.ko', 'Paths', 'Errors', 'Config', 'Log', 'Win32', 'Guard', 'Clip', 'Ocr', 'Room') { . (Join-Path '$kitLibDir' "`$n.ps1") }
+`$script:seen = @()
+function Send-KeyCombo { param(`$Hwnd, `$Keys, `$ExpectedTitle) `$script:seen += `$Keys }
+function Use-TextClipboard { param(`$Text, [scriptblock]`$Action) & `$Action }
+`$p = Get-DefaultRoomProvider
+& `$p.PasteText 1 'abc' 'title'
+'SEEN=' + (`$script:seen -join ',')
+"@
+        try {
+            [System.IO.File]::WriteAllText($tmp, $body, (New-Object System.Text.UTF8Encoding($true)))
+            $out = (& powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File $tmp 2>&1 | Out-String)
+            $out | Should Match 'SEEN=Ctrl\+V'
+        }
+        finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 Describe 'Room: 소스 규칙' {
-    It 'Room.ps1 sends only Ctrl+F (open the search), Ctrl+A (select the search box text) and Ctrl+V as keys, closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
+    It 'Room.ps1 sends only Ctrl+F (open the search) and Ctrl+V as keys (never Ctrl+A, the add-friend shortcut), closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
         $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Room.ps1') -Raw -Encoding UTF8
         $keys = @([regex]::Matches($src, "-Keys '([^']*)'") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-        $keys.Count | Should Be 3
-        $keys[0] | Should Be 'Ctrl+A'
-        $keys[1] | Should Be 'Ctrl+F'
-        $keys[2] | Should Be 'Ctrl+V'
+        $keys.Count | Should Be 2
+        $keys[0] | Should Be 'Ctrl+F'
+        $keys[1] | Should Be 'Ctrl+V'
         # Enter·Delete·Esc 같은 키는 방 열기에서 절대 보내지 않는다(Ctrl+A 는 선택만 하므로 지우거나 보내지 않는다).
         $src | Should Not Match "-Keys '(Enter|Delete|Backspace|Esc)"
         $src | Should Not Match '\[KakaoWin32\]::'
