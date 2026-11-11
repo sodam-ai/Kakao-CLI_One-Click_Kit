@@ -830,6 +830,8 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 
 ### When the safety device stopped the work (messages that appear once the feature is connected)
 
+**Read this first.** The Korean "입력하지 않았습니다" (no input was made) at the end of the messages below means that **the one input where it stopped** (a click or a key) was not made. In a job made of several inputs, such as opening a room, the inputs before it (for example the first click) may already have gone out. In the S5 run on 2026-11-12 this was misread and an earlier click that had gone out was missed. So read which inputs went out from the job's steps (opening a room: click → `Ctrl+A` → `Ctrl+V` → …), not from the message alone.
+
 These messages are already in the code, but the matching commands are not connected yet, so you cannot see them on screen now. The kit always prints them in Korean; the meaning is given here.
 
 | Message on screen | Meaning | What to do |

@@ -916,6 +916,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr><td><code>설정 파일을 저장하지 못했습니다. 폴더 권한이나 디스크 공간을 확인해 주세요: &lt;파일 경로&gt;</code> (The settings file could not be saved. Check folder permissions or disk space: path)</td><td>No permission on the folder, or not enough disk space.</td><td>Check the permissions and free disk space of the <code>%LOCALAPPDATA%\KakaoKit</code> folder.</td></tr>
 </tbody></table></div>
 <h3>When the safety device stopped the work (messages that appear once the feature is connected)</h3>
+<p><strong>Read this first.</strong> The Korean "입력하지 않았습니다" (no input was made) at the end of the messages below means that <strong>the one input where it stopped</strong> (a click or a key) was not made. In a job made of several inputs, such as opening a room, the inputs before it (for example the first click) may already have gone out. In the S5 run on 2026-11-12 this was misread and an earlier click that had gone out was missed. So read which inputs went out from the job's steps (opening a room: click → <code>Ctrl+A</code> → <code>Ctrl+V</code> → …), not from the message alone.</p>
 <p>These messages are already in the code, but the matching commands are not connected yet, so you cannot see them on screen now. The kit always prints them in Korean; the meaning is given here.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Message on screen</th><th>Meaning</th><th>What to do</th></tr></thead>
