@@ -150,6 +150,9 @@ public static class KakaoWin32 {
     public static void PostClose(long h) { PostMessageW(new IntPtr(h), 0x0010, IntPtr.Zero, IntPtr.Zero); }
     // 지금 이 스레드의 DPI 인식 상태: 2 = 모니터별(MonitorDpi 를 믿을 수 있음), 1 = 시스템, 0 = 인식 안 함, -1 = 모름. 읽기만 한다.
     // GetDpiForMonitor 의 결과는 호출한 스레드의 DPI 인식을 따르므로 프로세스가 아니라 스레드 값을 읽는다.
+    // 한계: Microsoft 문서는 모니터별 인식 스레드에서 GetDpiForMonitor 대신 GetDpiForWindow 를 권한다. 그러나 카카오톡 창은 시스템 인식이라
+    // GetDpiForWindow 가 96 으로 나오는 것이 결함(D-24)의 원인이고, 이 PC 에서 실측(창 96, 모니터 144)으로 모니터 값이 맞음을 확인해 썼다.
+    // 혼합 인식 호스트나 다른 Windows 버전에서의 동작은 확인하지 못했다.
     // EnableDpiAwareness 는 실패를 알리지 않으므로(안 되면 시스템 인식으로 떨어질 수 있음) 배율을 믿기 전에 이 값을 확인한다.
     public static int ThreadDpiAwareness() {
         try { return GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()); } catch (EntryPointNotFoundException) { return -1; }
