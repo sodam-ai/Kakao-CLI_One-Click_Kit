@@ -26,7 +26,9 @@ function Get-DefaultRoomProvider {
         # 검색을 Ctrl+F 로 연다(좌표 클릭 없음). 오픈채팅 화면에서 검색창이 열리는 것을 2026-11-12 에 실제로 확인했다(다른 탭은 미확인).
         OpenSearch     = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+F' -ExpectedTitle $title }
         PasteText      = { param($hwnd, $text, $title)
-            Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title }.GetNewClosure() }
+            # .GetNewClosure() 를 쓰지 않는다: 닫힌 블록은 전역 함수만 보여서, 라이브러리를 스크립트 안에서 불러온 실제 실행에서는 Send-KeyCombo 를 못 찾는다(S5 에서 확인).
+            # 여기서는 $hwnd·$title 이 호출 스택으로 보이므로 닫지 않아도 된다.
+            Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title } }
         # 결과를 확인하지 못했을 때 사용자에게 원인(창 크기·배율·가려짐)을 알려 주기 위해 창 상태를 읽는다. 읽기만 하고 입력하지 않는다.
         Explain        = { param($hwnd) Get-RoomFailureHint -Hwnd $hwnd }
         TabIsOpenChat  = { param($hwnd) Test-OpenChatTab -Hwnd $hwnd }

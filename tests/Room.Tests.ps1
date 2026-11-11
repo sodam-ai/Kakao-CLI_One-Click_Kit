@@ -412,7 +412,8 @@ function Use-TextClipboard { param(`$Text, [scriptblock]`$Action) & `$Action }
 "@
         try {
             [System.IO.File]::WriteAllText($tmp, $body, (New-Object System.Text.UTF8Encoding($true)))
-            $out = (& powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File $tmp 2>&1 | Out-String)
+            # -File 은 스크립트가 전역 범위에서 돌아 함수가 전역이 된다(사고를 못 잡는다). 실제 실행처럼 호출 연산자(&)로 부른다.
+            $out = (& powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command "& '$tmp'" 2>&1 | Out-String)
             $out | Should Match 'SEEN=Ctrl\+V'
         }
         finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
