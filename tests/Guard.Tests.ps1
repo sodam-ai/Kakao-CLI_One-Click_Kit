@@ -435,6 +435,16 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
         }
     }
 
+    It 'SetForeground detaches the input thread it attached to, in a finally block, and never sends input itself' {
+        $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Win32.ps1') -Raw -Encoding UTF8
+        $m = [regex]::Match($src, 'public static void SetForeground\(long h\) \{(?<body>.*?)\n    \}', 'Singleline')
+        $m.Success | Should Be $true
+        $body = $m.Groups['body'].Value
+        $body | Should Match 'AttachThreadInput\(me, fgThread, true\)'
+        $body | Should Match 'finally \{[^}]*AttachThreadInput\(me, fgThread, false\)'
+        $body | Should Not Match 'SendInput|keybd_event|mouse_event|PostMessage'
+    }
+
     It 'the native layer allows Ctrl+F (it gets past the key table and stops at the window check, status 1) and still refuses Ctrl+Shift+F' {
         # 입력을 보내지 않는다: 창 번호 0 은 카카오톡 창이 아니라서 허용 표를 통과한 뒤 1 에서 멈춘다.
         [KakaoWin32]::SendCombo(0, 'x', [byte[]](0x11, 0x46), 0) | Should Be 1

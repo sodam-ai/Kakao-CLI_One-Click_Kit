@@ -129,6 +129,8 @@ function Test-OpenChatTabLines {
         if ($fy -lt 0.05 -or $fy -gt 0.13) { continue }
         $text = [string]$line.Text -replace '\s', ''
         if ($fx -ge 0.15 -and $fx -le 0.35 -and [string]::Equals($text, '채팅', 'Ordinal')) { $hasTitle = $true }
+        # 글자 읽기가 제목과 갈래 이름을 한 줄로 붙여 읽는 경우("채팅오픈치l팅•", 실제 화면에서 봄): "채팅" 바로 뒤가 "오픈"일 때만 둘 다 있는 것으로 본다.
+        elseif ($fx -ge 0.15 -and $fx -le 0.35 -and $text.StartsWith('채팅오픈', [System.StringComparison]::Ordinal)) { $hasTitle = $true; $hasBranch = $true }
         elseif ($fx -ge 0.30 -and $fx -le 0.55 -and $text.StartsWith('오픈', [System.StringComparison]::Ordinal)) { $hasBranch = $true }
     }
     return ($hasTitle -and $hasBranch)

@@ -497,6 +497,14 @@ Describe 'Ocr: Test-OpenChatTabLines (첫 클릭 전 탭 확인, 화면 없이 �
         Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom), $sub, $row1Name) | Should Be $true
     }
 
+    It 'is true when the reader joins the title and the branch label into one line (seen on the real screen)' {
+        Test-Tab @((New-Line '채팅오픈치l팅•' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $true
+    }
+
+    It 'is false for one joined line that has no open-chat label after the title' {
+        Test-Tab @((New-Line '채팅전체' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    }
+
     It 'tolerates a space inside the title and a cleanly read label' {
         Test-Tab @((New-Line '채 팅' $hdrX $hdrTop $hdrBottom), (New-Line '오픈채팅' $subX $hdrTop $hdrBottom)) | Should Be $true
     }
