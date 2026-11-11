@@ -485,32 +485,36 @@ Describe 'Ocr: 화면 글자 읽기 엔진' {
 }
 
 Describe 'Ocr: Test-OpenChatTabLines (첫 클릭 전 탭 확인, 화면 없이 판정)' {
-    # 실제 화면에서 친구 탭의 맨 윗줄 제목 "친구"는 창 폭의 0.223, 창 높이의 0.097 에 있었다(2026-11-12 읽기 전용 측정). 픽셀로 옮긴 값이다.
+    # 실제 화면(2026-11-12 읽기 전용 측정, 창 588x753): 친구 탭의 맨 윗줄 제목은 "친구"(창 폭 0.223, 높이 0.097).
+    # 사용자가 "오픈채팅 탭"이라고 한 화면은 제목 "채팅"(0.223, 0.097)과 갈래 이름 "오픈채팅"(0.388, 0.097; 글자 읽기는 "오픈치l팅 •" 로 읽음)이 함께 있다.
+    # 픽셀로 옮긴 값이다.
     $hdrX = 131; $hdrTop = 73; $hdrBottom = 95
+    $subX = 228
+    $sub = New-Line '오픈치l팅 •' $subX $hdrTop $hdrBottom
     function Test-Tab($lines) { return (Test-OpenChatTabLines -Lines $lines -ImageWidth $W -ImageHeight $H) }
 
-    It 'is true when the header title line says the open-chat tab' {
-        Test-Tab @((New-Line '오픈채팅' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $true
+    It 'is true on the measured screen: the chats title plus the open-chat branch label (the reader may garble the label)' {
+        Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom), $sub, $row1Name) | Should Be $true
     }
 
-    It 'tolerates a space the reader inserted inside the title' {
-        Test-Tab @((New-Line '오픈 채팅' $hdrX $hdrTop $hdrBottom)) | Should Be $true
+    It 'tolerates a space inside the title and a cleanly read label' {
+        Test-Tab @((New-Line '채 팅' $hdrX $hdrTop $hdrBottom), (New-Line '오픈채팅' $subX $hdrTop $hdrBottom)) | Should Be $true
     }
 
     It 'is false on the friends tab, because the same spot there is the add-friend button' {
         Test-Tab @((New-Line '친구' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $false
     }
 
-    It 'is false on the chats tab' {
+    It 'is false when only the chats title was read (the branch label is missing)' {
         Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom)) | Should Be $false
     }
 
-    It 'is false when the words appear only lower in the window (a room name or preview is not the tab title)' {
-        Test-Tab @((New-Line '오픈채팅' 220 300 324), $row1Name) | Should Be $false
+    It 'is false when the words appear only lower in the window (a room name or preview is not the header)' {
+        Test-Tab @((New-Line '채팅' 220 300 324), (New-Line '오픈채팅방' 228 330 354), $row1Name) | Should Be $false
     }
 
-    It 'is false when the title line has extra characters (another word, not the tab title)' {
-        Test-Tab @((New-Line '오픈채팅방' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    It 'is false when the title line has extra characters (another word, not the title)' {
+        Test-Tab @((New-Line '채팅방' $hdrX $hdrTop $hdrBottom), $sub) | Should Be $false
     }
 
     It 'is false when nothing could be read' {
