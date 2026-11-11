@@ -28,6 +28,7 @@ function Get-DefaultRoomProvider {
             Use-TextClipboard -Text $text -Action { Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title }.GetNewClosure() }
         # 결과를 확인하지 못했을 때 사용자에게 원인(창 크기·배율·가려짐)을 알려 주기 위해 창 상태를 읽는다. 읽기만 하고 입력하지 않는다.
         Explain        = { param($hwnd) Get-RoomFailureHint -Hwnd $hwnd }
+        TabIsOpenChat  = { param($hwnd) Test-OpenChatTab -Hwnd $hwnd }
         OcrAvailable   = { Test-OcrAvailable }
         ResultIsSingle = { param($hwnd, $name, $clickY) Test-SearchResultSingle -Hwnd $hwnd -ExpectedName $name -ClickRelY $clickY }
         CloseWindow    = { param($hwnd, $title) Close-KakaoWindow -Hwnd $hwnd -ExpectedTitle $title }
@@ -75,6 +76,12 @@ function Open-KakaoRoom {
         if (-not $AllowUnverifiedResult) { throw (New-KitError -Key 'room.ocrUnavailable' -ExitCode 3) }
         $check = $false
         Add-KitWarning -Warning (Get-Msg -Key 'room.unverifiedWarning')
+    }
+
+    # 첫 클릭 전에 오픈채팅 탭인지 확인한다. 탭이 다르면 같은 자리가 다른 버튼이다(친구 탭에서는 친구 추가).
+    # 글자를 읽을 수 없어 사람이 확인 없이 열기를 허용한 경우($check 가 거짓)에는 확인하지 않는다.
+    if ($check -and $Provider.ContainsKey('TabIsOpenChat') -and -not [bool](& $Provider.TabIsOpenChat $main)) {
+        throw (New-KitError -Key 'room.notOpenChatTab' -ExitCode 2)
     }
 
     $mainTitle = $script:RoomMainTitle

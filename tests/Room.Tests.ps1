@@ -13,6 +13,7 @@ function New-FakeRoomProvider {
         ResultThrows = $false
         SelectAllThrows = $false
         Hint         = ''
+        TabOpenChat  = $true
     }
     $s.Provider = @{
         Windows        = { [void]$s.Calls.Add('Windows'); if ($s.WindowsQueue.Count -gt 0) { $s.Last = @($s.WindowsQueue.Dequeue()) }; $s.Last }.GetNewClosure()
@@ -21,6 +22,7 @@ function New-FakeRoomProvider {
         SelectAll      = { param($hwnd, $title) [void]$s.Calls.Add(('SelectAll:{0}:{1}' -f $hwnd, $title)); if ($s.SelectAllThrows) { throw 'select broke' } }.GetNewClosure()
         Explain        = { param($hwnd) [void]$s.Calls.Add('Explain'); $s.Hint }.GetNewClosure()
         PasteText      = { param($hwnd, $text, $title) [void]$s.Calls.Add(('Paste:{0}:{1}:{2}' -f $hwnd, $text, $title)) }.GetNewClosure()
+        TabIsOpenChat  = { param($hwnd) [void]$s.Calls.Add('TabCheck'); $s.TabOpenChat }.GetNewClosure()
         OcrAvailable   = { [void]$s.Calls.Add('OcrAvailable'); $s.OcrAvailable }.GetNewClosure()
         ResultIsSingle = { param($hwnd, $name, $clickY) [void]$s.Calls.Add(('ResultCheck:{0}:{1}:{2}' -f $hwnd, $name, $clickY)); if ($s.ResultThrows) { throw 'ocr broke' }; $s.ResultSingle }.GetNewClosure()
         CloseWindow    = { param($hwnd, $title) [void]$s.Calls.Add(('Close:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
@@ -173,6 +175,34 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
             $e.ExitCode | Should Be 3
             (Get-InputCalls $f).Count | Should Be 0
             ($f.Calls -contains 'WaitIdle') | Should Be $false
+        }
+    }
+
+    It 'does not click anything when the open-chat tab is not showing (the icon spot is add-friend on the friends tab)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeRoomProvider
+            $f.TabOpenChat = $false
+            $f.WindowsQueue.Enqueue(@($MainWin))
+            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
+            $e.ExitCode | Should Be 2
+            $e.Message | Should Match '오픈채팅'
+            ($f.Calls -contains 'TabCheck') | Should Be $true
+            (Get-InputCalls $f).Count | Should Be 0
+            ($f.Calls -contains 'WaitIdle') | Should Be $false
+        }
+    }
+
+    It 'checks the tab before the first click when the tab is right, then opens as before' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-OpenScenario
+            $r = Open-KakaoRoom -Name '테스트방' -Provider $f.Provider
+            $r.OpenedByKit | Should Be $true
+            $tab = [array]::IndexOf(@($f.Calls), 'TabCheck')
+            $click = [array]::IndexOf(@($f.Calls), @($f.Calls | Where-Object { $_ -like 'Click:*' })[0])
+            ($tab -ge 0) | Should Be $true
+            ($tab -lt $click) | Should Be $true
         }
     }
 

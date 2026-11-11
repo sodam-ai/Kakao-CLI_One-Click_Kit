@@ -112,6 +112,30 @@ function Test-MainWindowUncovered {
     return $true
 }
 
+# 맨 윗줄의 탭 제목이 "오픈채팅"인지 본다. 탭이 다르면 같은 자리의 아이콘이 다른 버튼이다(친구 탭에서는 검색 돋보기 자리가 친구 추가).
+# 제목은 창 폭의 0.15~0.40, 창 높이의 0.05~0.13 에 있다(친구 탭의 "친구"를 2026-11-12 에 읽기 전용으로 잰 값: 0.223, 0.097).
+# 오픈채팅 탭의 실제 위치는 잰 값이 아니므로 같은 띠로 가정했다. 틀리면 이 판정은 거짓이 되어 방을 열지 않는다(안전한 쪽으로만 틀린다).
+# 띠 안의 글자 전체가 공백을 뺀 "오픈채팅"과 같을 때만 참이다. 읽은 글자가 없으면 거짓이다.
+function Test-OpenChatTabLines {
+    param($Lines, [double]$ImageWidth, [double]$ImageHeight)
+    if ($ImageWidth -le 0 -or $ImageHeight -le 0) { return $false }
+    foreach ($line in @($Lines)) {
+        $fx = $line.Left / $ImageWidth
+        $fy = $line.Top / $ImageHeight
+        if ($fy -lt 0.05 -or $fy -gt 0.13 -or $fx -lt 0.15 -or $fx -gt 0.40) { continue }
+        if ([string]::Equals(([string]$line.Text -replace '\s', ''), '오픈채팅', 'Ordinal')) { return $true }
+    }
+    return $false
+}
+
+# 메인 창이 지금 오픈채팅 탭인지 화면에서 읽는다. 읽기만 하고 입력하지 않는다. 가려져 있거나 읽지 못하면 거짓이다.
+function Test-OpenChatTab {
+    param([Parameter(Mandatory)][long]$Hwnd)
+    $r = Get-SearchResultLines -Hwnd $Hwnd
+    if ($r.Covered) { return $false }
+    return (Test-OpenChatTabLines -Lines $r.Lines -ImageWidth $r.Width -ImageHeight $r.Height)
+}
+
 # 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Width·Height(캡처 크기 픽셀), Scale(창이 놓인 모니터의 배율), Covered(가려져 있으면 참).
 # 판정 영역이 가려져 있으면 읽지 않고 Covered 를 참으로 돌려준다(그러면 아래 판정은 거짓이 되어 방을 열지 않는다).
 function Get-SearchResultLines {

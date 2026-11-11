@@ -484,6 +484,40 @@ Describe 'Ocr: 화면 글자 읽기 엔진' {
     }
 }
 
+Describe 'Ocr: Test-OpenChatTabLines (첫 클릭 전 탭 확인, 화면 없이 판정)' {
+    # 실제 화면에서 친구 탭의 맨 윗줄 제목 "친구"는 창 폭의 0.223, 창 높이의 0.097 에 있었다(2026-11-12 읽기 전용 측정). 픽셀로 옮긴 값이다.
+    $hdrX = 131; $hdrTop = 73; $hdrBottom = 95
+    function Test-Tab($lines) { return (Test-OpenChatTabLines -Lines $lines -ImageWidth $W -ImageHeight $H) }
+
+    It 'is true when the header title line says the open-chat tab' {
+        Test-Tab @((New-Line '오픈채팅' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $true
+    }
+
+    It 'tolerates a space the reader inserted inside the title' {
+        Test-Tab @((New-Line '오픈 채팅' $hdrX $hdrTop $hdrBottom)) | Should Be $true
+    }
+
+    It 'is false on the friends tab, because the same spot there is the add-friend button' {
+        Test-Tab @((New-Line '친구' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $false
+    }
+
+    It 'is false on the chats tab' {
+        Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    }
+
+    It 'is false when the words appear only lower in the window (a room name or preview is not the tab title)' {
+        Test-Tab @((New-Line '오픈채팅' 220 300 324), $row1Name) | Should Be $false
+    }
+
+    It 'is false when the title line has extra characters (another word, not the tab title)' {
+        Test-Tab @((New-Line '오픈채팅방' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    }
+
+    It 'is false when nothing could be read' {
+        Test-Tab @() | Should Be $false
+    }
+}
+
 Describe 'Ocr: 읽기만 하는 파일' {
     It 'Ocr.ps1 never writes to disk, so what was on screen cannot leak (capture stays in memory)' {
         $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Ocr.ps1') -Raw -Encoding UTF8
