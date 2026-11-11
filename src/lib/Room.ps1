@@ -3,11 +3,12 @@
 # 이 파일은 작업 전체를 감싸는 잠금(Enter-KitLock)을 잡지 않는다. 부르는 쪽(명령 계층)이 잡는다.
 # 필요한 부품: Config(Test-RoomAllowed, Find-Room, Get-KitConfig), Log(Add-KitWarning), Guard, Win32, Clip, Ocr.
 
-# 메인 창 제목과 클릭 위치(창 크기에 대한 비율, 0~1). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서
+# 메인 창 제목과 결과 줄 클릭 위치(창 크기에 대한 비율, 0~1). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서
 # 스파이크 S2·S3 로 확인한 값이다. 다른 창 크기·배율·탭에서는 다시 측정해야 한다.
 $script:RoomMainTitle = '카카오톡'
+# 검색은 돋보기 좌표를 누르지 않고 Ctrl+F 로 연다: 같은 좌표가 탭에 따라 다른 버튼(친구 탭=친구 추가, 채팅 탭=새 채팅)이라 S5 에서 사고가 났다(D-25).
+# 남은 클릭은 검색 결과 첫 줄 더블클릭 하나뿐이고, 그 앞에 결과가 정확히 1건임을 확인한다.
 $script:RoomAnchors = @{
-    SearchIcon     = @(0.714, 0.116)
     FirstResultRow = @(0.45, 0.335)
 }
 $script:RoomResultRenderMs = 1200   # 붙여넣은 뒤 검색 결과가 그려질 때까지 기다리는 시간
@@ -22,6 +23,8 @@ function Get-DefaultRoomProvider {
         Click          = { param($hwnd, $relX, $relY, $double, $title)
             if ($double) { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -Double -ExpectedTitle $title }
             else { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -ExpectedTitle $title } }
+        # 검색을 Ctrl+F 로 연다(좌표 클릭 없음). 오픈채팅 화면에서 검색창이 열리는 것을 2026-11-12 에 실제로 확인했다(다른 탭은 미확인).
+        OpenSearch     = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+F' -ExpectedTitle $title }
         # 검색창에 남은 글자를 붙여넣기가 덮어쓰도록 전체 선택(Ctrl+A)을 한다. 선택만 하고 지우거나 보내지 않는다.
         SelectAll      = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+A' -ExpectedTitle $title }
         PasteText      = { param($hwnd, $text, $title)
@@ -78,19 +81,17 @@ function Open-KakaoRoom {
         Add-KitWarning -Warning (Get-Msg -Key 'room.unverifiedWarning')
     }
 
-    # 첫 클릭 전에 오픈채팅 탭인지 확인한다. 탭이 다르면 같은 자리가 다른 버튼이다(친구 탭에서는 친구 추가).
+    # 첫 입력(Ctrl+F) 전에 오픈채팅 화면인지 확인한다. 다른 탭에서 Ctrl+F 가 같은 검색창을 여는지는 확인하지 못해, 확인된 화면에서만 연다.
     # 글자를 읽을 수 없어 사람이 확인 없이 열기를 허용한 경우($check 가 거짓)에는 확인하지 않는다.
     if ($check -and $Provider.ContainsKey('TabIsOpenChat') -and -not [bool](& $Provider.TabIsOpenChat $main)) {
         throw (New-KitError -Key 'room.notOpenChatTab' -ExitCode 2)
     }
 
     $mainTitle = $script:RoomMainTitle
-    $iconX = $script:RoomAnchors.SearchIcon[0]
-    $iconY = $script:RoomAnchors.SearchIcon[1]
     $rowX = $script:RoomAnchors.FirstResultRow[0]
     $rowY = $script:RoomAnchors.FirstResultRow[1]
     & $Provider.WaitIdle
-    & $Provider.Click $main $iconX $iconY $false $mainTitle
+    & $Provider.OpenSearch $main $mainTitle
     # 검색창에 이전에 넣은 글자가 남아 있어도 붙여넣기가 덮어쓰도록 전체 선택을 먼저 한다(실제 카카오톡에서의 동작은 시험으로 확인한다).
     & $Provider.SelectAll $main $mainTitle
     & $Provider.PasteText $main $title $mainTitle
