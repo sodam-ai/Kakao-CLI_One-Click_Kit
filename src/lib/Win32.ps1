@@ -91,7 +91,7 @@ public static class KakaoWin32 {
         try { return (int)GetDpiForWindow(new IntPtr(h)); } catch (EntryPointNotFoundException) { return 0; }
     }
     // 창이 놓인 모니터의 실제 DPI. 화면에 보이는 창 크기는 이 값을 따른다. 창이 어느 모니터에도 없거나 읽지 못하면 0. 읽기만 한다.
-    // 호출하는 쪽 프로세스가 모니터별 DPI 인식이어야 실제 값이 나온다(EnableDpiAwareness).
+    // 호출하는 쪽 스레드가 모니터별 DPI 인식이어야 실제 값이 나온다(EnableDpiAwareness, ThreadDpiAwareness 로 확인).
     public static int MonitorDpi(long h) {
         if (h == 0) return 0;
         try {
@@ -148,9 +148,10 @@ public static class KakaoWin32 {
         return HeldKeyFrom(delegate (int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; });
     }
     public static void PostClose(long h) { PostMessageW(new IntPtr(h), 0x0010, IntPtr.Zero, IntPtr.Zero); }
-    // 이 프로세스의 DPI 인식 상태: 2 = 모니터별(MonitorDpi 를 믿을 수 있음), 1 = 시스템, 0 = 인식 안 함, -1 = 모름. 읽기만 한다.
-    // EnableDpiAwareness 는 실패를 알리지 않으므로(안 되면 시스템 인식으로 떨어짐) 배율을 믿기 전에 이 값을 확인한다.
-    public static int ProcessDpiAwareness() {
+    // 지금 이 스레드의 DPI 인식 상태: 2 = 모니터별(MonitorDpi 를 믿을 수 있음), 1 = 시스템, 0 = 인식 안 함, -1 = 모름. 읽기만 한다.
+    // GetDpiForMonitor 의 결과는 호출한 스레드의 DPI 인식을 따르므로 프로세스가 아니라 스레드 값을 읽는다.
+    // EnableDpiAwareness 는 실패를 알리지 않으므로(안 되면 시스템 인식으로 떨어질 수 있음) 배율을 믿기 전에 이 값을 확인한다.
+    public static int ThreadDpiAwareness() {
         try { return GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()); } catch (EntryPointNotFoundException) { return -1; }
     }
     // 가장 좋은 DPI 설정(모니터마다 배율이 달라도 실제 픽셀 좌표)을 시도하고, 안 되면 기본 설정으로 되돌아간다.
@@ -250,8 +251,8 @@ function Get-DefaultInputProvider {
 function Enable-KitDpiAwareness { [KakaoWin32]::EnableDpiAwareness() }
 
 # 창 DPI 와 모니터 DPI 중 쓸 값을 고른다. 모니터 값이 우선이다: 카카오톡 창은 "시스템 DPI 인식"이라 150% 모니터에서도 창 DPI 가 96 으로 나오지만 화면에는 150% 크기로 보인다(D-24).
-# 모니터 값은 이 프로세스가 모니터별 DPI 인식(-Awareness 2)일 때만 믿는다: 아니면 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아난다(Codex 검증 지적).
-# 그때는 창 값을 쓴다(= 고치기 전 동작: 안전하게 거절하는 쪽). 모니터 값을 모르면(0 이하) 창 값, 그것도 모르면 96(100%).
+# 모니터 값은 호출한 스레드가 모니터별 DPI 인식(-Awareness 2)일 때만 믿는다: 아니면 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아난다(Codex 검증 지적).
+# 그때는 창 값을 쓴다(= 고치기 전 동작). 이 경로가 항상 안전하게 거절된다는 보장은 없다(DPI 가상화 상황은 미검증). 모니터 값을 모르면(0 이하) 창 값, 그것도 모르면 96(100%).
 function Select-KitDpi {
     param([int]$WindowDpi, [int]$MonitorDpi, [int]$Awareness = 2)
     if ($MonitorDpi -gt 0 -and $Awareness -eq 2) { return $MonitorDpi }
@@ -262,7 +263,7 @@ function Select-KitDpi {
 # 창이 놓인 모니터의 배율(1.0 = 100%, 1.5 = 150%). 알 수 없으면 1.0. DPI 설정을 켠 뒤에 불러야 실제 값이 나온다.
 function Get-KitWindowScale {
     param([long]$Hwnd)
-    $dpi = Select-KitDpi -WindowDpi ([KakaoWin32]::WindowDpi($Hwnd)) -MonitorDpi ([KakaoWin32]::MonitorDpi($Hwnd)) -Awareness ([KakaoWin32]::ProcessDpiAwareness())
+    $dpi = Select-KitDpi -WindowDpi ([KakaoWin32]::WindowDpi($Hwnd)) -MonitorDpi ([KakaoWin32]::MonitorDpi($Hwnd)) -Awareness ([KakaoWin32]::ThreadDpiAwareness())
     return ($dpi / 96.0)
 }
 

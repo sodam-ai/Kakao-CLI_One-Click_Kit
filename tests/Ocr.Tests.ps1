@@ -318,9 +318,9 @@ Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)
         }
     }
 
-    # D-24 보강(2026-11-11, Codex 검증 지적): 모니터 DPI 는 이 프로세스가 모니터별 DPI 인식(2)일 때만 믿을 수 있다.
-    # 아니면(시스템 인식 1, 비인식 0, 모름 -1) 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아나므로 믿지 않고 창 값을 쓴다(= 고치기 전 동작, 안전하게 거절하는 쪽).
-    It 'Select-KitDpi trusts the monitor DPI only when the process is per-monitor aware (awareness 2)' {
+    # D-24 보강(2026-11-11, Codex 검증 지적): 모니터 DPI 는 호출한 스레드가 모니터별 DPI 인식(2)일 때만 믿을 수 있다.
+    # 아니면(시스템 인식 1, 비인식 0, 모름 -1) 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아나므로 믿지 않고 창 값을 쓴다(= 고치기 전 동작).
+    It 'Select-KitDpi trusts the monitor DPI only when the calling thread is per-monitor aware (awareness 2)' {
         Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 2 | Should Be 144
         Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 1 | Should Be 96
         Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 0 | Should Be 96
@@ -329,15 +329,15 @@ Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)
         Select-KitDpi -WindowDpi 120 -MonitorDpi 144 -Awareness 1 | Should Be 120
     }
 
-    It 'Enable-KitDpiAwareness makes a fresh process per-monitor aware (the DPI fix depends on it)' {
+    It 'Enable-KitDpiAwareness makes the main thread of a fresh process per-monitor aware (the DPI fix depends on it)' {
         $win32 = Join-Path $kitLibDir 'Win32.ps1'
-        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ". '$win32'; Enable-KitDpiAwareness; [KakaoWin32]::ProcessDpiAwareness()"
+        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ". '$win32'; Enable-KitDpiAwareness; [KakaoWin32]::ThreadDpiAwareness()"
         ([string]($out | Select-Object -Last 1)).Trim() | Should Be '2'
     }
 
-    It 'Get-KitWindowScale hands the real process awareness to Select-KitDpi' {
+    It 'Get-KitWindowScale hands the real thread awareness to Select-KitDpi' {
         Enable-KitDpiAwareness
-        $expected = [KakaoWin32]::ProcessDpiAwareness()
+        $expected = [KakaoWin32]::ThreadDpiAwareness()
         Mock Select-KitDpi { return 96 }
         [void](Get-KitWindowScale -Hwnd 0)
         Assert-MockCalled Select-KitDpi -Exactly 1 -ParameterFilter ([scriptblock]::Create('$Awareness -eq ' + $expected))
