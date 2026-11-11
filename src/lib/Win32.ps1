@@ -22,8 +22,6 @@ public static class KakaoWin32 {
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
-    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowTextW(IntPtr h, StringBuilder s, int max);
     [DllImport("user32.dll")] static extern int GetWindowTextLengthW(IntPtr h);
@@ -118,16 +116,7 @@ public static class KakaoWin32 {
     public static void SetForeground(long h) {
         IntPtr p = new IntPtr(h);
         if (IsIconic(p)) ShowWindow(p, 9);
-        // 터미널 같은 다른 프로그램이 앞에 있으면 윈도우가 SetForegroundWindow 를 거절한다. 앞 창의 입력 스레드에 잠깐 붙어서 가져오고 바로 뗀다.
-        // 이 함수는 입력을 보내지 않는다. 가져왔는지는 부르는 쪽(Guard)이 다시 확인한다.
-        IntPtr fg = GetForegroundWindow();
-        uint fgPid;
-        uint fgThread = (fg == IntPtr.Zero) ? 0 : GetWindowThreadProcessId(fg, out fgPid);
-        uint me = GetCurrentThreadId();
-        bool attached = false;
-        if (fgThread != 0 && fgThread != me) attached = AttachThreadInput(me, fgThread, true);
-        try { SetForegroundWindow(p); }
-        finally { if (attached) AttachThreadInput(me, fgThread, false); }
+        SetForegroundWindow(p);
     }
     public static long LastInputTick() {
         LASTINPUTINFO li = new LASTINPUTINFO();

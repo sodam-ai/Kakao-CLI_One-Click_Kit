@@ -1105,7 +1105,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Bootstrap.Tests.ps1` | 24 | Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, `시작.bat` working with special characters in the folder name, `.gitignore` entries, behaviour of `version` and of an unknown command, no pointer to a `help` command that does not exist, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not |
 | `Config.Tests.ps1` | 30 | Allowed list, permissions, only a person may change, consent, strange hand-edited settings |
 | `Log.Tests.ps1` | 11 | Records without message text, tidying the record file, error report |
-| `Guard.Tests.ps1` | 45 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
+| `Guard.Tests.ps1` | 44 | The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent) |
 | `Clip.Tests.ps1` | 9 | Saving, replacing and restoring the clipboard, stopping on an image or file |
 | `Parse.Tests.ps1` | 20 | Reading export files, strange dates and times, line-end differences |
 | `Status.Tests.ps1` | 23 | Reading the installed KakaoTalk version (registry cross-checked with the process; no version when unreadable), letter-for-letter check against the tested versions, read-only, the switch for real-operation tests |
@@ -1113,7 +1113,7 @@ The first line runs everything, the second runs only the `Config` tests. It uses
 | `Room.Tests.ps1` | 28 | Opening a room: the allowed list first, reusing an already-open window, select-all in the search box before the paste, the tab check before the first click (no click or key unless it is the open-chat tab), the check before opening (no double-click when it cannot check) with the reason for a stop explained, the title check after opening, closing only a window the kit opened, no key other than Ctrl+A and Ctrl+V in the source |
 | `Readme.Tests.ps1` | 29 | The guide converter, whether the guide equals reality (test counts, command status, version, on-screen messages, links), that every on-screen message the kit can show is in the guide, the LICENSE text and owner |
 | `Export.Tests.ps1` | 28 | Keeping, reading and searching exports: the per-room keeping folder name (cannot leave the folder), keeping the 3 newest and 30 days with protection of other files, refusing a file whose room name differs, the Korean message for a storage failure, `-Last` and `-Since`, the allowed list and AI reading permission, letter-for-letter search without duplicates |
-| **Total** | **309** | |
+| **Total** | **308** | |
 
 ### Building the guide html
 
