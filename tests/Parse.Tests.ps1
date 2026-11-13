@@ -196,3 +196,29 @@ Describe 'Parse: 파일 형식 차이' {
         finally { Remove-Item -LiteralPath $p -Force }
     }
 }
+
+Describe 'Parse: 고정 결과(속도 개선 전후 동일성)' {
+    It '날짜·이어지는 줄·잘못된 머리글이 뒤섞인 파일을 기존 파서와 똑같이 읽는다' {
+        $rnd = New-Object System.Random 7
+        $pieces = @('[나] [오전 1:05] 안녕', '[A] [오후 12:00] x', '[B] [오후 99:99] bad', '[C] [오전 1:01]', '[길동] [오후 11:59] 끝 [내용]',
+            '--------------- 2026년 10월 21일 수요일 ---------------', '--------------- 2026년 13월 45일 수요일 ---------------', '--- 그냥 줄 ---', '',
+            '이어지는 줄', '[깨진 머리글', '  [x] [오전 1:00] 앞공백', '--------------- 2024년 2월 29일 목요일 ---------------', '[X] [오전 0:30] 자정')
+        $ls = @('테스트방 님과 카카오톡 대화', '저장한 날짜 : 2026-10-27 04:10:00', '')
+        for ($j = 0; $j -lt 400; $j++) { $ls += $pieces[$rnd.Next(0, $pieces.Count)] }
+        $p = New-TempExport ($ls -join "`r`n")
+        try {
+            $r = ConvertFrom-KakaoExport -Path $p
+            $sb = New-Object System.Text.StringBuilder
+            foreach ($m in $r.Messages) {
+                $ts = 'NULL'
+                if ($null -ne $m.Timestamp) { $ts = $m.Timestamp.ToString('yyyyMMddHHmm') }
+                [void]$sb.Append($ts + '|' + $m.Sender + '|' + ($m.Text -replace "`n", '\n') + "`n")
+            }
+            $sha = [System.Security.Cryptography.SHA256]::Create()
+            $digest = [BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($sb.ToString()))).Replace('-', '').ToLower()
+            @($r.Messages).Count | Should Be 140
+            $digest | Should Be '792e5a7ee922213887a5d6c05ddbc2a7d3ad5bc5aaaa94a8918075647f1590ad'
+        }
+        finally { Remove-Item -LiteralPath $p -Force }
+    }
+}
