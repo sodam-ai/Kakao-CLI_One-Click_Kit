@@ -58,6 +58,10 @@ function Assert-SendTextValid {
     if ($visible.Length -eq 0 -or $Text -match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F  ‪-‮⁦-⁩]') {
         throw (New-KitError -Key 'send.textInvalid' -ExitCode 1)
     }
+    # 짝이 없는 서로게이트(깨진 UTF-16)는 클립보드를 거치며 다른 글자로 바뀌거나 깨질 수 있어 거절한다. 정상적인 이모지 짝은 통과한다.
+    if ($Text -match '[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]') {
+        throw (New-KitError -Key 'send.textInvalid' -ExitCode 1)
+    }
 }
 
 function Get-SendStatePath {

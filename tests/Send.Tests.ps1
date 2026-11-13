@@ -257,6 +257,21 @@ Describe 'Send: 검토에서 나온 빈틈 (호출자 구분·AI 시도 번호·
         }
     }
 
+    It 'rejects a lone surrogate (broken UTF-16 would reach the clipboard damaged) but accepts a proper emoji pair' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeSendProvider
+            $pair = [char]::ConvertFromUtf32(0x1F600)
+            foreach ($bad in @("a$([char]0xD800)b", "a$([char]0xDC00)b", ([string][char]0xD83D), ([string][char]0xDE00), ($pair + [char]0xD800), ([char]0xDC00 + $pair), ($pair.Substring(1) + $pair.Substring(0, 1)))) {
+                (Get-ThrownError { Send-KakaoMessage -Room '테스트방' -Text $bad -DryRun -Caller 'human' -Provider $f.Provider }).ExitCode | Should Be 1
+            }
+            foreach ($ok in @($pair, "a${pair}b", ($pair + $pair))) {
+                (Send-KakaoMessage -Room '테스트방' -Text $ok -DryRun -Caller 'human' -Provider $f.Provider).Status | Should Be 'preview'
+            }
+            (Get-SendInputCalls $f).Count | Should Be 0
+        }
+    }
+
     It 'the reason for each exit-2 stop is the right one (the tests do not only look at the code)' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
