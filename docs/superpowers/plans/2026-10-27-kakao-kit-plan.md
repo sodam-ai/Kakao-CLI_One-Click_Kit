@@ -4,20 +4,22 @@
 
 **Goal:** 비개발자도 `시작.bat` 더블클릭으로 카카오톡 PC의 보내기·읽기·내보내기·검색을 쓰고, AI는 `kakao` CLI로 같은 기능을 쓰는 Windows 키트를 만든다.
 
-**Architecture:** `시작.bat`(메뉴, `choice`) / `kakao.cmd`(CLI) → `src/kakao.ps1` 라우터 → `src/lib/*.ps1` 모듈(Win32 입력 계층 + 가드 + 방 열기 + 내보내기 + 파서 + 설정). 카카오톡 조작은 키 화이트리스트(Ctrl+S/V/A/C, Enter)와 3중 가드를 통과해야만 한다. 읽기는 공식 내보내기(Ctrl+S) 파일 파싱.
+**Architecture:** `시작.bat`(메뉴, `choice`) / `kakao.cmd`(CLI) → `src/kakao.ps1` 라우터 → `src/lib/*.ps1` 모듈(Win32 입력 계층 + 가드 + 방 열기 + 내보내기 + 파서 + 설정). 카카오톡 조작은 키 화이트리스트(Ctrl+S/V/C/F, Enter — 2026-11-13: Ctrl+A 제거, Ctrl+F 추가)와 3중 가드를 통과해야만 한다. 읽기는 공식 내보내기(Ctrl+S) 파일 파싱.
 
 **Tech Stack:** Windows PowerShell 5.1(내장), `.bat`/`choice.exe`, Win32 P/Invoke(`Add-Type`), `Windows.Media.Ocr`(선택), Pester 3.4.0(내장, 시험).
 
 **Spec:** `docs/superpowers/specs/2026-10-27-kakao-kit-design.md` (13.6의 기본값 포함). 번호(§)는 이 문서의 장 번호.
 
-**Repo note:** 프로젝트 폴더는 git 저장소가 아니므로 commit 단계는 없다. 각 작업이 끝나면 `tasks/todo.md`에 체크하고 `tools/Test-All.ps1` 통과를 기록한다.
+**동기화 안내 (2026-11-13):** 이 계획서는 작성 당시(2026-10-27) 기준이다. 실제 코드와 다른 곳은 코드가 정본이다. 이번에 고친 것: 허용 키는 **다섯 개(Ctrl+S, Ctrl+V, Ctrl+C, Ctrl+F, Enter)이고 Ctrl+A 는 없다**(친구 추가 창을 연다) · 방 열기는 돋보기 클릭이 아니라 **Ctrl+F** · 포커스는 키트가 만드는 것이 아니라 **사람이 카카오톡을 클릭하고 키트는 기다림**(설계서 13.8) · 보내기는 **키트가 직접 연 창에만**(입력란 초안 확인용 Ctrl+A 는 쓰지 않음, 설계서 13.2) · 저장 창에서 Ctrl+A 는 쓰지 않음(설계서 13.9). 그 밖의 차이는 CHECKPOINT 2.3·`tasks/progress.md` 의 `Ruling:` 을 본다.
+
+**Repo note:** (작성 당시 기록. 지금은 git 저장소이며 작업 브랜치와 커밋 규칙은 CHECKPOINT 3.C 를 따른다.) 프로젝트 폴더는 git 저장소가 아니므로 commit 단계는 없다. 각 작업이 끝나면 `tasks/todo.md`에 체크하고 `tools/Test-All.ps1` 통과를 기록한다.
 
 ## Global Constraints
 
 - Windows 11 + Windows PowerShell 5.1만. winget/pwsh 없음. 관리자 권한 요청 금지(`RunAs`·`-Verb`·`Program Files` 쓰기·서비스·작업 스케줄러 금지), 레지스트리는 `HKCU`만 (§6.2)
 - 사용자 출력은 전부 한글. 메뉴 항목은 `한글 (english)` 병기, 오류·안내·도움말은 한글만 (§6.2)
 - **인코딩**: 모든 `.ps1`는 UTF-8 **BOM 포함**(PS 5.1이 BOM 없는 UTF-8을 cp949로 읽음), 모든 `.bat`/`.cmd`는 UTF-8 **BOM 없음** + CRLF + 첫 줄 이후 `chcp 65001`. 시험이 강제한다 (§8)
-- 허용 입력 키는 `Ctrl+S`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C`, `Enter`뿐. **Esc 금지**, ≡ 메뉴 마우스 클릭 금지 (§7.3)
+- 허용 입력 키는 `Ctrl+S`, `Ctrl+V`, `Ctrl+C`, `Ctrl+F`, `Enter`뿐(2026-11-13: `Ctrl+A` 제거 — 카카오톡 메인 창에서 "친구 추가"를 연다, `Ctrl+F` 추가 — 통합검색). **Esc 금지**, ≡ 메뉴 마우스 클릭 금지 (§7.3)
 - 입력 직전 가드: 대상 창이 KakaoTalk 프로세스 소유 + 창 제목 == 방 이름(정확히) + 포그라운드. 하나라도 틀리면 입력 0 (§7.2)
 - 방 이름은 허용 목록과 정확히 일치. 근사 일치 없음 (§7.1)
 - 전송: 한 번에 한 방·한 메시지, 최소 간격 **2초**, 최대 **1000자**(스펙에 값 없음 → 내 판단), 기본은 미리보기+확인, 비대화형은 `--yes` 필요 (§7.4)
@@ -106,11 +108,11 @@ tasks/todo.md
 - Test: `tests/Guard.Tests.ps1`
 
 **Interfaces:**
-- Produces: `Get-KakaoWindows : object[]{Hwnd,Class,Title,ProcessName,Rect}` (EnumWindows 기반, UIA 아님 — 모달 저장 창 포함) · `Send-KeyCombo -Hwnd <long> -Keys 'Ctrl+S'|'Ctrl+V'|'Ctrl+A'|'Ctrl+C'|'Enter'` (**화이트리스트 밖이면 throw**, 보내기 전에 `Assert-InputTarget` 호출을 강제하는 `-Guard` 인자 포함) · `Invoke-RelClick -Hwnd <long> -RelX <double> -RelY <double> [-Double]` (0~1 비례 좌표, 클릭 지점의 최상위 창이 `Hwnd`인지 확인) · `Close-KakaoWindow -Hwnd <long>` (`WM_CLOSE`만) · `Assert-InputTarget -Hwnd <long> -ExpectedTitle <string> [-Provider <hashtable>]` (실패 시 `[KakaoGuardException]`, 한글 메시지, 종료 코드 2) · `Wait-UserIdle -Seconds <int>` · `Enter-KitLock` / `Exit-KitLock` (명명된 mutex, 두 번째는 종료 코드 2)
+- Produces: `Get-KakaoWindows : object[]{Hwnd,Class,Title,ProcessName,Rect}` (EnumWindows 기반, UIA 아님 — 모달 저장 창 포함) · `Send-KeyCombo -Hwnd <long> -Keys 'Ctrl+S'|'Ctrl+V'|'Ctrl+C'|'Ctrl+F'|'Enter'`(2026-11-13: Ctrl+A 제거·Ctrl+F 추가) (**화이트리스트 밖이면 throw**, 보내기 전에 `Assert-InputTarget` 호출을 강제하는 `-Guard` 인자 포함) · `Invoke-RelClick -Hwnd <long> -RelX <double> -RelY <double> [-Double]` (0~1 비례 좌표, 클릭 지점의 최상위 창이 `Hwnd`인지 확인) · `Close-KakaoWindow -Hwnd <long>` (`WM_CLOSE`만) · `Assert-InputTarget -Hwnd <long> -ExpectedTitle <string> [-Provider <hashtable>]` (실패 시 `[KakaoGuardException]`, 한글 메시지, 종료 코드 2) · `Wait-UserIdle -Seconds <int>` · `Enter-KitLock` / `Exit-KitLock` (명명된 mutex, 두 번째는 종료 코드 2)
 
 - [ ] **Step 1: 시험 작성**(가짜 Provider로): 제목 불일치·소유 프로세스가 KakaoTalk 아님·포그라운드 아님 → 각각 throw 이고 **입력 함수 호출 횟수 0**(스파이) · 모두 정상 → throw 없음 · `Send-KeyCombo -Keys 'Esc'`/`'Alt+F4'`/`'Delete'` → throw · `src` 전체에서 키 코드 `0x1B`·`VK_ESCAPE` 사용 없음(grep 시험) · `Enter-KitLock` 두 번째 호출 throw · `Wait-UserIdle` 가 최근 입력을 감지하면 throw
 - [ ] **Step 2: 실패 확인** → FAIL
-- [ ] **Step 3: 구현** P/Invoke는 `Add-Type`으로 한 클래스(`KakaoWin32`)에 모은다. 모든 좌표는 DPI 인식(`SetProcessDPIAware`) 후 물리 픽셀. 포커스는 입력 직전마다 `SetForegroundWindow` 재호출 + 재확인(터미널이 포커스를 가져간 사례, spec §9)
+- [ ] **Step 3: 구현** P/Invoke는 `Add-Type`으로 한 클래스(`KakaoWin32`)에 모은다. 모든 좌표는 DPI 인식(`SetProcessDPIAware`) 후 물리 픽셀. 포커스는 입력 직전마다 `SetForegroundWindow` 재호출 + 재확인(터미널이 포커스를 가져간 사례, spec §9). **(2026-11-13 정정: 키트가 맨 앞으로 만들지는 못한다. 맨 앞이 아니면 입력 0 으로 기다리고 사람이 클릭한다. 설계서 13.8, 대기 로직은 M11 에서 구현)**
 - [ ] **Step 4: 통과 확인**
 
 ## Task 5: 텍스트 클립보드 보존
@@ -141,7 +143,7 @@ tasks/todo.md
 
 - [ ] **Step 1: 스파이크(먼저)**: 이 PC에서 ① 돋보기·검색 결과 행의 **비례 좌표 앵커**(창 크기 변경·배율에서도 맞는지), ② "나와의 채팅"이 검색·열기·제목 확인에서 비밀방과 같은지, ③ 같은 이름 방 둘 이상일 때 OCR이 무엇을 보이는지를 확인해 `docs/spike-notes.md`에 기록
 - [ ] **Step 2: 시험 작성**: 허용 안 된 방 → throw 이고 Win32 호출 0 · OCR 없음(`Test-OcrAvailable` 가짜 `$false`)이면 열기 전 확인을 건너뛰고 제목 확인만, `status`용 경고 플래그 설정 · 열린 뒤 제목이 다르면 `Close-KakaoWindow` 후 throw(입력 0) · E2E(`KAKAO_E2E=1`): "비밀방"과 "나와의 채팅" 각각 열림 → `Hwnd`의 제목 == 방 이름, 두 번째 호출은 새 창 없이 재사용(`OpenedByKit=$false`), 직접 연 창만 닫힘
-- [ ] **Step 3: 구현** 순서: `Wait-UserIdle` → 메인 창 포커스+가드(제목 `카카오톡`) → 돋보기 클릭(비례 좌표) → `Use-TextClipboard`로 방 이름 붙여넣기 → OCR 확인 → 첫 결과 더블클릭 → `Get-KakaoWindows` 로 최대 8초 폴링해 제목이 정확히 일치하는 창을 찾음(창 생성 1~3초 지연, spec §9) → 검색어 지우기·탭 복원
+- [ ] **Step 3: 구현** 순서: `Wait-UserIdle` → 메인 창 포커스+가드(제목 `카카오톡`) → **(2026-11-13: 돋보기 클릭 대신 `Ctrl+F` 로 통합검색 열기, 그 전에 오픈채팅 탭 확인)** → `Use-TextClipboard`로 방 이름 붙여넣기 → OCR 확인 → 첫 결과 더블클릭 → `Get-KakaoWindows` 로 최대 8초 폴링해 제목이 정확히 일치하는 창을 찾음(창 생성 1~3초 지연, spec §9) → 검색어 지우기·탭 복원
 - [ ] **Step 4: 통과 확인**
 
 ## Task 8: 보내기 (E2E 포함)
@@ -152,7 +154,7 @@ tasks/todo.md
 
 **Interfaces:**
 - Consumes: Task 2, 4, 5, 7
-- Produces: `Test-InputBoxEmpty -Hwnd <long> : bool` (입력란 Ctrl+A→Ctrl+C 센티널 방식, 불확실하면 `$false`) · `Send-KakaoMessage -Room <string> -Text <string> [-DryRun] [-Yes] [-Caller human|ai] [-AllowUnverified] : PSCustomObject{Status('confirmed'|'failed'|'unknown'),Sent,Reason}`(설계서 13.7); CLI는 `--file <경로>`와 `-`(표준 입력)로 본문을 받을 수 있음(특수문자 안전 경로)
+- Produces: ~~`Test-InputBoxEmpty -Hwnd <long> : bool` (입력란 Ctrl+A→Ctrl+C 센티널 방식, 불확실하면 `$false`)~~ **(2026-11-13: Ctrl+A 가 허용 키가 아니므로 만들지 않는다. 대신 키트가 직접 연 창에만 보내고, 이미 열려 있으면 입력 0 으로 중단한다 — 설계서 13.2)** · `Send-KakaoMessage -Room <string> -Text <string> [-DryRun] [-Yes] [-Caller human|ai] [-AllowUnverified] : PSCustomObject{Status('confirmed'|'failed'|'unknown'),Sent,Reason}`(설계서 13.7); CLI는 `--file <경로>`와 `-`(표준 입력)로 본문을 받을 수 있음(특수문자 안전 경로)
 
 - [ ] **Step 1: 시험 작성**: `-DryRun`은 입력 함수 호출 0 · 빈 문자열·1001자 거부 · 허용 목록에 없거나 `canSend=false` 거부 · `-Caller ai`는 `aiSend` 없으면 거부 · 비대화형(`IsInputRedirected`)에서 `selfOnly=false` 방은 `-Yes` 없으면 거부 · 마지막 전송 후 2초 이내 재전송 거부 · 카카오톡 버전 미검증이면 `-AllowUnverified` 없이 종료 코드 4 · 본문 `"a&b|c^d%e!"`·이모지·`` `n `` 포함 문자열이 `Use-TextClipboard`에 **변형 없이** 전달됨(스파이) · `--file`로 읽은 UTF-8 본문도 동일 · **(13.7)** 결과는 확인됨/실패/불명 셋 중 하나이고, 입력을 보낸 뒤 확인하지 못하면 '불명'이며 이때 전송 입력 호출은 1회로 끝난다(자동 재시도 0) · 같은 시도 번호를 다시 쓰면 입력 0으로 거부 · 입력란에 초안이 있으면 입력 0
 - [ ] **Step 2: 실패 확인** → FAIL
@@ -172,7 +174,7 @@ tasks/todo.md
 
 - [ ] **Step 1: 시험 작성**(합성 폴더): 스냅샷 4개 → 최신 3개만 남음 · 31일 지난 스냅샷 삭제 · `latest.txt` 는 항상 가장 새 것 · 같은 메시지가 스냅샷마다 있어도 `Search-KakaoExports` 결과 중복 없음 · 허용·`aiRead` 규칙은 Task 2와 동일하게 적용 · E2E: Task 8에서 보낸 토큰이 `Read-KakaoRoom -Last 5` 결과에 있음
 - [ ] **Step 2: 실패 확인** → FAIL
-- [ ] **Step 3: 구현** `Export-KakaoRoom`: 방 열기 → 가드 → `Ctrl+S` → `Get-KakaoWindows` 에서 클래스 `#32770`·제목 `다른 이름으로 저장`·KakaoTalk 소유 창을 최대 8초 폴링 → 그 창에 포커스+가드 → `Ctrl+A` → `Use-TextClipboard`로 **항상 새 파일명**(타임스탬프)의 임시 경로 붙여넣기 → `Enter` → 파일이 생기고 크기 > 0 일 때까지 최대 10초 대기. 예상 밖 창이 뜨거나 시간 초과면 **그 창에만 `Close-KakaoWindow`** 하고 종료 코드 3. 임시 경로는 키트 데이터 폴더(한글·공백 없는 경로)
+- [ ] **Step 3: 구현** `Export-KakaoRoom`: 방 열기 → 가드 → `Ctrl+S` → `Get-KakaoWindows` 에서 클래스 `#32770`·제목 `다른 이름으로 저장`·KakaoTalk 소유 창을 최대 8초 폴링 → 그 창에 포커스+가드 → ~~`Ctrl+A`~~ **(2026-11-13: Ctrl+A 는 쓰지 않는다. 파일 이름 칸이 기본으로 선택돼 있어 붙여넣기만으로 바뀌는지는 S6a 에서 확인, 안 바뀌면 키를 늘리지 않고 멈춘다 — 설계서 13.9)** → `Use-TextClipboard`로 **항상 새 파일명**(타임스탬프)의 임시 경로 붙여넣기 → `Enter` → 파일이 생기고 크기 > 0 일 때까지 최대 10초 대기. 예상 밖 창이 뜨거나 시간 초과면 **그 창에만 `Close-KakaoWindow`** 하고 종료 코드 3. 임시 경로는 키트 데이터 폴더(한글·공백 없는 경로)
 - [ ] **Step 4: 통과 확인**
 
 ## Task 10: 상태·버전·로그인 안내·미검증 모드
