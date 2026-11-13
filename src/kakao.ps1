@@ -18,6 +18,13 @@ function Invoke-KakaoCommand {
             Write-Host (Get-Msg -Key 'version.banner' -FormatArgs @(Get-KitVersion))
             return 0
         }
+        'send' {
+            # 보내기에 필요한 부품은 이 명령일 때만 불러온다(version 등 다른 명령은 카카오톡 관련 부품을 건드리지 않는다).
+            foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'Send', 'SendCommand') {
+                . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+            }
+            return (Invoke-SendCommand -Argv @($Argv | Select-Object -Skip 1))
+        }
         default {
             Write-Host (Get-Msg -Key 'error.unknownCommand' -FormatArgs @($Argv[0]))
             return 1
