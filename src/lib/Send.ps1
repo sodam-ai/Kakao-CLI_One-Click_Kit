@@ -1,17 +1,23 @@
 ﻿# 메시지 보내기(M8)의 안전 틀. 이 파일은 "입력이 나가기 전에 거절해야 하는 것"과 "입력이 나간 뒤의 결과 분류"를 맡는다.
 # 아직 어떤 명령에도 연결되지 않았다. 실제 제공자는 입력란 위치를 측정하기 전이라 일부러 잠겨 있다(Ready = 거짓): 부르면 입력 0 으로 멈춘다.
-# 이 파일은 작업 전체를 감싸는 잠금(Enter-KitLock)을 잡지 않는다. 부르는 쪽(명령 계층, M11)이 잡아야 간격·시도 기록이 프로세스 사이에서 안전하다.
+# 이 파일은 작업 전체를 감싸는 잠금(Enter-KitLock)을 잡지 않는다. 부르는 쪽(명령 계층, M11)이 잡아야 하고, 잡지 않았으면 여기서 거절한다
+# (간격·시도 기록의 읽기와 쓰기가 한 덩어리로 안전하려면 한 번에 하나의 실행만 있어야 한다).
 # 필요한 부품: Config(Test-RoomAllowed, Find-Room, Get-KitConfig), Status(Get-KitMode, Assert-SendAllowedByMode), Room, Clip, Guard, Log.
 #
-# 결과(설계서 13.7): 입력을 보내기 전에 멈추면 예외(종료 코드가 붙은 한글 설명 = "실패"). 입력을 보낸 뒤에는 예외가 아니라
+# 결과(설계서 13.7): 키가 나가기 전에 멈추면 예외(종료 코드가 붙은 한글 설명 = "실패"). 키가 나간 뒤에는 예외가 아니라
 # 결과 객체를 돌려준다: 'confirmed'(보낸 글이 방에 나타난 것을 확인) 또는 'unknown'(입력은 보냈지만 확인 못 함). 'preview'는 -DryRun.
 # 불명일 때 자동 재시도는 없다: 같은 글을 다시 보내면 중복 전송이 되기 때문이다.
+#
+# 풀기 전의 관문(Ready 를 참으로 바꾸기 전에 실제 카카오톡으로 확인해야 하는 것, 모두 미확인):
+#   (1) 입력란 위치(비례 좌표)와 방 창을 열었을 때 입력란에 바로 입력되는지
+#   (2) 카카오톡이 방 창을 닫은 뒤에도 쓰다 만 글(초안)을 남기는지, 창을 파괴하지 않고 숨기기만 하는지(그러면 "키트가 연 창"이 낡은 창일 수 있다)
+#   (3) 여러 줄·이모지·긴 글이 붙여넣기로 그대로 들어가는지, 기다리는 시간(0.8초)이 충분한지
 
 $script:SendMaxLength = 1000
 $script:SendMinIntervalSeconds = 2
 $script:SendAttemptKeep = 100
-# 붙여넣기(Ctrl+V)와 Enter 를 보낸 뒤 클립보드를 되돌리기 전에 기다리는 시간. 카카오톡이 아직 붙여넣기 전인데 사용자의 원래 클립보드 글로 되돌리면
-# 그 글이 대신 전송될 수 있다(위험 R-04). 값(0.8초)은 측정 전 추정이며 실제 시험에서 확인해야 한다.
+# 붙여넣기(Ctrl+V)를 보낸 뒤 클립보드를 되돌리기 전에 기다리는 시간. 카카오톡이 아직 붙여넣기 전인데 사용자의 원래 클립보드 글로 되돌리면
+# 그 글이 대신 전송될 수 있다(위험 R-04). Enter 가 실패해도 기다린다. 값(0.8초)은 측정 전 추정이며 실제 시험에서 확인해야 한다.
 $script:SendSettleMs = 800
 
 # 실제 부품 묶음. 시험은 이 묶음을 가짜로 바꿔 끼운다(Room.ps1 의 제공자와 같은 방식).
@@ -22,15 +28,19 @@ function Get-DefaultSendProvider {
         Ready      = { $false }
         Mode       = { Get-KitMode }
         Now        = { [datetime]::UtcNow }
+        # 명령 계층이 Enter-KitLock 으로 잡은 실행 잠금을 이 프로세스가 쥐고 있는가.
+        LockHeld   = { $null -ne $script:KitLockMutex }
         OpenRoom   = { param($name, $caller) Open-KakaoRoom -Name $name -Caller $caller -Action 'send' }
         FocusInput = { param($hwnd, $title) throw (New-KitError -Key 'send.notReady' -ExitCode 3) }
         # 블록을 닫지 않는다(클로저 금지): 닫힌 블록은 전역 함수만 보여서 스크립트 안에서 불러온 실제 실행에서 Send-KeyCombo 를 못 찾는다(S5 에서 확인).
-        PasteEnter = { param($hwnd, $text, $title)
+        # $progress.KeysSent 는 Ctrl+V 가 실제로 나간 뒤에만 참이 된다. 그 전에 멈추면 "실패", 그 뒤에 멈추면 "불명"이다.
+        PasteEnter = { param($hwnd, $text, $title, $progress)
             $settleMs = $script:SendSettleMs
             Use-TextClipboard -Text $text -Action {
                 Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+V' -ExpectedTitle $title
-                Send-KeyCombo -Hwnd $hwnd -Keys 'Enter' -ExpectedTitle $title
-                Start-Sleep -Milliseconds $settleMs
+                $progress.KeysSent = $true
+                try { Send-KeyCombo -Hwnd $hwnd -Keys 'Enter' -ExpectedTitle $title }
+                finally { Start-Sleep -Milliseconds $settleMs }
             } }
         # 보낸 글이 방에 나타났는지 읽어서 확인하는 일은 읽기(M9 내보내기)가 연결된 뒤에 한다. 그전에는 확인하지 못한다(결과 = 불명).
         VerifySent = { param($room, $text, $attemptId) $null }
@@ -38,11 +48,14 @@ function Get-DefaultSendProvider {
     }
 }
 
-# 보낼 글 검사: 비어 있지 않고(공백뿐인 글도 거절), 1000자 이하이고, 탭·줄바꿈 말고 보이지 않는 조작 문자가 없을 것.
+# 보낼 글 검사: 눈에 보이는 글자가 있어야 하고(공백·보이지 않는 글자뿐이면 거절), 1000자 이하이고(UTF-16 단위로 센다, 이모지는 2),
+# 탭·줄바꿈 말고 조작 문자(C0·C1, 줄/문단 구분자, 글자 방향 조작)가 없을 것. 이모지 이음 글자(U+200D 등)는 허용한다.
 function Assert-SendTextValid {
     param([AllowNull()][AllowEmptyString()][string]$Text)
     $ErrorActionPreference = 'Stop'
-    if ([string]::IsNullOrWhiteSpace($Text) -or $Text.Length -gt $script:SendMaxLength -or $Text -match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]') {
+    if ($null -eq $Text -or $Text.Length -gt $script:SendMaxLength) { throw (New-KitError -Key 'send.textInvalid' -ExitCode 1) }
+    $visible = $Text -replace '[\s​-‍⁠﻿]', ''
+    if ($visible.Length -eq 0 -or $Text -match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F  ‪-‮⁦-⁩]') {
         throw (New-KitError -Key 'send.textInvalid' -ExitCode 1)
     }
 }
@@ -52,11 +65,15 @@ function Get-SendStatePath {
 }
 
 # 마지막 시도 시각과 최근 시도 번호. 파일이 없으면 빈 기록. 있는데 읽을 수 없거나 모양이 틀리면 멈춘다(모르면 보내지 않는다).
+# 본 파일은 없고 임시 파일(.tmp)만 있으면 교체 도중 멈춘 흔적일 수 있어 기록이 사라진 것으로 보고 멈춘다.
 function Read-SendState {
     $ErrorActionPreference = 'Stop'
     $path = Get-SendStatePath
     $empty = [pscustomobject]@{ LastAttemptUtc = $null; Attempts = @() }
-    if (-not (Test-Path -LiteralPath $path)) { return $empty }
+    if (-not (Test-Path -LiteralPath $path)) {
+        if (Test-Path -LiteralPath ($path + '.tmp')) { throw (New-KitError -Key 'send.stateUnusable' -FormatArgs @($path + '.tmp') -ExitCode 2) }
+        return $empty
+    }
     try {
         $raw = [System.IO.File]::ReadAllText($path, (New-Object System.Text.UTF8Encoding($false)))
         $json = $raw | ConvertFrom-Json -ErrorAction Stop
@@ -80,7 +97,8 @@ function Read-SendState {
     catch { throw (New-KitError -Key 'send.stateUnusable' -FormatArgs @($path) -ExitCode 2) }
 }
 
-# 기록을 임시 파일에 쓴 뒤 바꿔치기한다. 쓰지 못하면 멈춘다(기록 없이 보내지 않는다).
+# 기록을 임시 파일에 쓴 뒤 교체한다. 기존 파일이 있으면 File.Replace(한 번에 교체)를 쓴다: Move-Item -Force 는 먼저 지우고 옮겨서
+# 그 사이에 멈추면 기록이 사라진다. 쓰지 못하면 멈춘다(기록 없이 보내지 않는다).
 function Save-SendState {
     param([Parameter(Mandatory)][datetime]$LastAttemptUtc, [Parameter(Mandatory)][string[]]$Ids)
     $ErrorActionPreference = 'Stop'
@@ -94,23 +112,28 @@ function Save-SendState {
         $json = ConvertTo-Json -InputObject $doc -Depth 4
         $tmp = $path + '.tmp'
         [System.IO.File]::WriteAllText($tmp, $json, (New-Object System.Text.UTF8Encoding($false)))
-        Move-Item -LiteralPath $tmp -Destination $path -Force
+        # 백업 경로는 진짜 null 이어야 한다. PowerShell 5.1 은 .NET 문자열 인자에 $null 을 넘겨도 빈 글자("")로 바꿔 "경로 형식이 올바르지 않다"는 오류가 난다
+        # (직접 재현해 확인함). [NullString]::Value 를 쓰면 진짜 null 이 전달된다.
+        if (Test-Path -LiteralPath $path) { [System.IO.File]::Replace($tmp, $path, [NullString]::Value) }
+        else { [System.IO.File]::Move($tmp, $path) }
     }
     catch { throw (New-KitError -Key 'send.stateUnusable' -FormatArgs @($path) -ExitCode 2) }
 }
 
-# 한 방에 한 글을 보낸다. 입력이 나가기 전의 모든 검사는 "하나라도 틀리면 입력 0"이다.
+# 한 방에 한 글을 보낸다. 키가 나가기 전의 모든 검사는 "하나라도 틀리면 입력 0"이다.
+#   -Caller         : human 또는 ai. 반드시 정확히 써야 한다(기본값 없음): 빠뜨린 호출이 사람 권한을 얻으면 안 되기 때문이다.
 #   -DryRun         : 검사만 하고 미리보기 결과를 돌려준다(입력·기록 없음).
 #   -Yes            : 실제로 보내는 데 필요한 확인. 없으면 거절한다.
 #   -AllowUnverified: 시험 안 한 카카오톡 버전에서도 보내기를 허용한다. 사람만 쓸 수 있다.
-#   -AttemptId      : 시도 번호(영문·숫자·밑줄·붙임표 64자 이내). 같은 번호로 다시 보낼 수 없다. 없으면 새로 만든다.
+#   -AttemptId      : 시도 번호(영문·숫자·밑줄·붙임표 64자 이내). 같은 번호로 다시 보낼 수 없다. AI 호출에는 반드시 필요하다:
+#                     번호가 없으면 같은 명령을 다시 실행했을 때 중복 전송을 막을 수 없다. 사람 호출은 없으면 새로 만든다.
 function Send-KakaoMessage {
     param(
         [string]$Room,
         [AllowNull()][AllowEmptyString()][string]$Text,
+        [string]$Caller,
         [switch]$DryRun,
         [switch]$Yes,
-        [ValidateSet('human', 'ai')][string]$Caller = 'human',
         [switch]$AllowUnverified,
         [string]$AttemptId,
         [hashtable]$Provider
@@ -120,8 +143,11 @@ function Send-KakaoMessage {
 
     try {
         # --- 입력 전의 검사(여기서 멈추면 입력 0) ---
+        if ($Caller -cne 'human' -and $Caller -cne 'ai') { throw (New-KitError -Key 'send.callerRequired' -ExitCode 1) }
         Assert-SendTextValid -Text $Text
-        if ($PSBoundParameters.ContainsKey('AttemptId') -and $AttemptId -cnotmatch '^[A-Za-z0-9_-]{1,64}$') {
+        $hasId = $PSBoundParameters.ContainsKey('AttemptId') -and -not [string]::IsNullOrEmpty($AttemptId)
+        # \A ... \z: 끝에 줄바꿈이 붙은 번호("abc`n")를 통과시키지 않는다($ 는 마지막 줄바꿈 앞에서도 맞는다).
+        if ($PSBoundParameters.ContainsKey('AttemptId') -and $AttemptId -cnotmatch '\A[A-Za-z0-9_-]{1,64}\z') {
             throw (New-KitError -Key 'send.attemptInvalid' -ExitCode 1)
         }
         if (-not [bool](& $Provider.Ready)) { throw (New-KitError -Key 'send.notReady' -ExitCode 3) }
@@ -136,6 +162,8 @@ function Send-KakaoMessage {
             return [pscustomobject]@{ Status = 'preview'; Sent = $false; Reason = 'dryRun'; AttemptId = $null; Room = $title; Message = $null }
         }
         if (-not $Yes) { throw (New-KitError -Key 'send.confirmRequired' -ExitCode 1) }
+        if ($Caller -ceq 'ai' -and -not $hasId) { throw (New-KitError -Key 'send.attemptInvalid' -ExitCode 1) }
+        if (-not [bool](& $Provider.LockHeld)) { throw (New-KitError -Key 'send.lockNotHeld' -ExitCode 2) }
 
         # --- 간격과 시도 번호: 입력 전에 기록한다(입력 뒤에 멈춰도 같은 시도가 반복되지 않게) ---
         $now = ([datetime](& $Provider.Now)).ToUniversalTime()
@@ -144,7 +172,7 @@ function Send-KakaoMessage {
             # 시계가 거꾸로 갔으면(차이가 음수) 안전 쪽으로 너무 이르다고 본다.
             if (($now - $state.LastAttemptUtc).TotalSeconds -lt $script:SendMinIntervalSeconds) { throw (New-KitError -Key 'send.tooSoon' -ExitCode 2) }
         }
-        $id = if ($PSBoundParameters.ContainsKey('AttemptId')) { $AttemptId } else { [guid]::NewGuid().ToString('N') }
+        $id = if ($hasId) { $AttemptId } else { [guid]::NewGuid().ToString('N') }
         if ($state.Attempts -ccontains $id) { throw (New-KitError -Key 'send.attemptRepeated' -ExitCode 2) }
         Save-SendState -LastAttemptUtc $now -Ids (@($state.Attempts) + $id)
 
@@ -153,11 +181,15 @@ function Send-KakaoMessage {
         try {
             # 이미 열려 있던 창에는 보내지 않는다: 입력란에 쓰다 만 글이 있는지 확인할 방법이 없다(설계서 13.2). 그 창은 닫지도 않는다.
             if (-not $opened.OpenedByKit) { throw (New-KitError -Key 'send.alreadyOpen' -ExitCode 2) }
-            & $Provider.FocusInput ([long]$opened.Hwnd) $title
+            [void](& $Provider.FocusInput ([long]$opened.Hwnd) $title)
 
-            # 여기부터는 입력이 나갔을 수 있다. 중간에 멈춰도 오류가 아니라 '불명'이고 다시 시도하지 않는다.
-            try { & $Provider.PasteEnter ([long]$opened.Hwnd) $Text $title }
-            catch { return (New-SendResult -Status 'unknown' -Reason 'inputInterrupted' -AttemptId $id -Room $title) }
+            # 키가 하나라도 나갔으면 중간에 멈춰도 오류가 아니라 '불명'이고 다시 시도하지 않는다. 하나도 안 나갔으면 "실패"(예외)다.
+            $progress = @{ KeysSent = $false }
+            try { [void](& $Provider.PasteEnter ([long]$opened.Hwnd) $Text $title $progress) }
+            catch {
+                if (-not $progress.KeysSent) { throw }
+                return (New-SendResult -Status 'unknown' -Reason 'inputInterrupted' -AttemptId $id -Room $title)
+            }
 
             # 확인은 "진짜 true 하나"일 때만 확인됨이다. 아무것도 못 돌려주거나 예외가 나거나 true 가 아닌 값(1, 글자 "true", 둘 이상)이면 불명이다.
             $verified = @()
@@ -181,7 +213,7 @@ function Send-KakaoMessage {
     }
 }
 
-# 입력이 나간 뒤의 결과 객체를 만들고 기록한다(본문 없음).
+# 키가 나간 뒤의 결과 객체를 만들고 기록한다(본문 없음).
 function New-SendResult {
     param([string]$Status, [string]$Reason, [string]$AttemptId, [string]$Room)
     $message = $null

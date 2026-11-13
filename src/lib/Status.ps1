@@ -114,7 +114,7 @@ function Test-SendAllowedByMode {
     $ErrorActionPreference = 'Stop'
 
     if ([string]::Equals($Mode, 'full', [System.StringComparison]::Ordinal)) { return $true }
-    if ([string]::Equals($Mode, 'readonly', [System.StringComparison]::Ordinal) -and $AllowUnverified -and $Caller -eq 'human') { return $true }
+    if ([string]::Equals($Mode, 'readonly', [System.StringComparison]::Ordinal) -and $AllowUnverified -and $Caller -ceq 'human') { return $true }
     return $false
 }
 
