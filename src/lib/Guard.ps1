@@ -32,6 +32,8 @@ $script:GuardStatusKeys = @{
 
 $script:KitInputBaseline = $null
 $script:KitLockMutex = $null
+# 대상 창을 앞으로 올리는 시도 횟수(입력 직전). 한 번도 안 올라오면 입력 0 으로 멈춘다.
+$script:ForegroundRaiseTries = 3
 
 function New-GuardError {
     param([Parameter(Mandatory)][string]$Key, [object[]]$FormatArgs = @())
@@ -118,8 +120,14 @@ function Send-KeyCombo {
     if (-not $Provider) { $Provider = Get-DefaultInputProvider }
     Assert-NoUserInterference -Provider $Provider
     # 터미널이 포커스를 자주 되가져가므로 입력 직전마다 다시 앞으로 가져오고, 가져왔는지 확인한다.
-    & $Provider.SetForeground $Hwnd
-    & $Provider.Sleep 80
+    # 한 번에 안 올라오면 최대 3번까지 다시 올린다(2026-11-14 시험에서 같은 조건인데 앞 3번만 멈췄고 원인은 못 찾았다).
+    # 다시 올리기 전마다 사람이 손댔는지 본다: 손댔으면 창을 다시 빼앗지 않고 멈춘다. 마지막 확인(Assert-InputTarget)은 그대로다.
+    for ($try = 1; $try -le $script:ForegroundRaiseTries; $try++) {
+        & $Provider.SetForeground $Hwnd
+        & $Provider.Sleep 80
+        if ([long](& $Provider.Foreground) -eq $Hwnd) { break }
+        Assert-NoUserInterference -Provider $Provider
+    }
     Assert-InputTarget -Hwnd $Hwnd -ExpectedTitle $ExpectedTitle -Provider $Provider
     Assert-NoUserInterference -Provider $Provider
     # 마지막 확인과 입력은 C# 한 번의 호출 안에서 이어서 한다(그 사이에 끼어들 틈이 없다).
