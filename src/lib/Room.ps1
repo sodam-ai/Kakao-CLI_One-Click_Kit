@@ -3,11 +3,11 @@
 # 이 파일은 작업 전체를 감싸는 잠금(Enter-KitLock)을 잡지 않는다. 부르는 쪽(명령 계층)이 잡는다.
 # 필요한 부품: Config(Test-RoomAllowed, Find-Room, Get-KitConfig), Log(Add-KitWarning), Guard, Win32, Clip, Ocr.
 
-# 메인 창 제목과 결과 줄 클릭 위치(창 크기에 대한 비율, 0~1). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서
-# 스파이크 S2·S3 로 확인한 값이다. 다른 창 크기·배율·탭에서는 다시 측정해야 한다.
+# 메인 창 제목과 결과 첫 줄의 높이(창 크기에 대한 비율, 0~1). 카카오톡 26.9.1.5339, 창 588x753(배율 150%), 오픈채팅 탭에서
+# 스파이크 S2·S3 로 확인한 값이고, 2026-11-15 에 5342 에서도 같은 크기·배율의 메인 창에서 결과 1건 확인이 통과했다. 다른 창 크기·배율·탭에서는 다시 측정해야 한다.
 $script:RoomMainTitle = '카카오톡'
 # 검색은 돋보기 좌표를 누르지 않고 Ctrl+F 로 연다: 같은 좌표가 탭에 따라 다른 버튼(친구 탭=친구 추가, 채팅 탭=새 채팅)이라 S5 에서 사고가 났다(D-25).
-# 남은 클릭은 검색 결과 첫 줄 더블클릭 하나뿐이고, 그 앞에 결과가 정확히 1건임을 확인한다.
+# 방은 마우스 클릭 없이 연다: 결과가 정확히 1건임을 확인한 뒤 Enter 하나로 첫 결과가 열린다(2026-11-15 확인). 클릭 좌표는 쓰지 않는다.
 $script:RoomAnchors = @{
     FirstResultRow = @(0.45, 0.335)
 }
@@ -20,9 +20,9 @@ function Get-DefaultRoomProvider {
     return @{
         Windows        = { Get-KakaoWindows }
         WaitIdle       = { Wait-UserIdle -Seconds 2 -TimeoutSeconds 10 }
-        Click          = { param($hwnd, $relX, $relY, $double, $title)
-            if ($double) { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -Double -ExpectedTitle $title }
-            else { Invoke-RelClick -Hwnd $hwnd -RelX $relX -RelY $relY -ExpectedTitle $title } }
+        # 결과가 정확히 1건일 때 첫 결과를 여는 Enter 하나. 2026-11-15 에 실제로 확인했다: 클릭 없이 Enter 로 방 창이 열린다(200ms).
+        # 그래서 마우스 클릭과 클릭 좌표가 필요 없다. 키 하나도 가드를 거친다(대상 창·제목·맨 앞·사람 손 확인).
+        PressEnter     = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Enter' -ExpectedTitle $title }
         # 검색을 Ctrl+F 로 연다(좌표 클릭 없음). 오픈채팅 화면에서 검색창이 열리는 것을 2026-11-12 에 실제로 확인했다(다른 탭은 미확인).
         OpenSearch     = { param($hwnd, $title) Send-KeyCombo -Hwnd $hwnd -Keys 'Ctrl+F' -ExpectedTitle $title }
         PasteText      = { param($hwnd, $text, $title)
@@ -88,7 +88,7 @@ function Open-KakaoRoom {
     }
 
     $mainTitle = $script:RoomMainTitle
-    $rowX = $script:RoomAnchors.FirstResultRow[0]
+    # 결과 확인이 보는 줄의 높이(창 높이에 대한 비율). 더 이상 클릭하는 위치가 아니라 "결과가 이 한 줄뿐인가"를 읽는 위치다.
     $rowY = $script:RoomAnchors.FirstResultRow[1]
     & $Provider.WaitIdle
     & $Provider.OpenSearch $main $mainTitle
@@ -96,15 +96,15 @@ function Open-KakaoRoom {
     # 검색창에 이전 글자가 남아 있으면 붙여넣은 글과 섞여 결과가 1건이 아니게 되고, 아래 확인에서 더블클릭 없이 멈춘다(fail-closed).
     & $Provider.PasteText $main $title $mainTitle
     & $Provider.Sleep $script:RoomResultRenderMs
-    # 더블클릭 직전의 관문: 결과가 정확히 1건이 아니거나 확인 중 오류가 나면 더블클릭하지 않는다.
-    # 더블클릭할 높이(rowY)를 확인에 함께 넘겨, 확인한 첫 줄과 클릭하는 줄이 같은 위치인지도 따진다.
+    # 첫 결과를 여는 Enter 직전의 관문: 결과가 정확히 1건이 아니거나 확인 중 오류가 나면 Enter 를 보내지 않는다.
+    # 첫 줄의 높이(rowY)를 확인에 함께 넘겨, 확인한 줄이 첫 결과 줄인지도 따진다.
     if ($check -and -not [bool](& $Provider.ResultIsSingle $main $title $rowY)) {
         # 멈춘 이유를 알려 준다(창 크기·배율이 다르거나 가려진 경우). 설명을 못 얻어도 멈춤 자체는 그대로다.
         $hint = ''
         if ($Provider.ContainsKey('Explain')) { try { $hint = [string](& $Provider.Explain $main) } catch { $hint = '' } }
         throw (New-KitError -Key 'room.resultNotSingle' -FormatArgs @($title, $hint) -ExitCode 2)
     }
-    & $Provider.Click $main $rowX $rowY $true $mainTitle
+    & $Provider.PressEnter $main $mainTitle
 
     # 방 창은 1~3초 늦게 생긴다. 새로 생긴 창만 본다. 제목이 아직 없는 새 창은 만드는 중일 수 있으므로 기다리고 닫지 않는다.
     $hit = @(); $others = @()
