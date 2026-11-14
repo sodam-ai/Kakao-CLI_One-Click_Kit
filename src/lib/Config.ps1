@@ -102,6 +102,9 @@ function Add-AllowedRoom {
         selfOnly = $SelfOnly
         aiRead   = $false
         aiSend   = $false
+        # 사람이 "이 방 입력란에는 쓰다 만 글을 남기지 않는다"고 표시했는가. 카카오톡은 방 창을 닫았다 열어도 초안을 남기므로(2026-11-14 시험),
+        # 이 표시가 없는 방에는 AI 가 보낼 수 없다. 처음에는 꺼져 있다.
+        noDraft  = $false
     }
     Set-ConfigRooms -Config $cfg -Rooms (@(Get-ConfigRooms -Config $cfg) + $room)
     Save-KitConfig -Config $cfg
@@ -128,7 +131,7 @@ function Set-RoomPermission {
     )
     $ErrorActionPreference = 'Stop'
     Assert-HumanPath -Human:$Human
-    if ($Permission -cnotin 'aiRead', 'aiSend', 'canSend') { throw (New-KitError -Key 'error.permissionInvalid' -FormatArgs @($Permission) -ExitCode 1) }
+    if ($Permission -cnotin 'aiRead', 'aiSend', 'canSend', 'noDraft') { throw (New-KitError -Key 'error.permissionInvalid' -FormatArgs @($Permission) -ExitCode 1) }
     $cfg = Get-KitConfig
     $room = Find-Room -Config $cfg -Name $Name
     if (-not $room) { throw (New-KitError -Key 'error.roomNotFound' -FormatArgs @($Name) -ExitCode 1) }
@@ -141,6 +144,14 @@ function Set-RoomPermission {
 function Test-RoomFlag {
     param($Value)
     return (($Value -is [bool]) -and ($Value -eq $true))
+}
+
+# 사람이 "초안을 남기지 않는 방"으로 표시한 방만 $true(진짜 true 일 때만). 없는 방·항목 없음·글자 "true" 는 모두 $false.
+function Test-RoomNoDraft {
+    param([string]$Name)
+    $room = Find-Room -Config (Get-KitConfig) -Name $Name
+    if (-not $room) { return $false }
+    return (Test-RoomFlag $room.noDraft)
 }
 
 # 허용 목록에 정확히 있는 방만 $true. 모르는 동작·호출자는 전부 $false(안전 쪽으로 닫힘).

@@ -2,7 +2,7 @@
 # 규칙: 호출자는 --human 이 있고 키보드 입력이 막혀 있지 않을 때만 사람이고, 그 밖에는 AI 로 본다(기본이 더 엄격한 쪽).
 # 허용 목록 변경(rooms add/remove/set)은 사람만 한다(Config.ps1 의 Assert-HumanPath). 대화 본문과 찾은 낱말은 기록(로그)에 남기지 않는다.
 
-$script:UsageRooms = 'kakao rooms list | add <방> --type open|self|normal [--self-only] --human | remove <방> --human | set <방> <aiRead|aiSend|canSend> <on|off> --human'
+$script:UsageRooms = 'kakao rooms list | add <방> --type open|self|normal [--self-only] --human | remove <방> --human | set <방> <aiRead|aiSend|canSend|noDraft> <on|off> --human'
 $script:UsageRead = 'kakao read <방> [--since 7d|12h] [--last N] [--human]'
 $script:UsageSearch = 'kakao search <낱말> [--room <방>] [--human]'
 $script:UsageStatus = 'kakao status'

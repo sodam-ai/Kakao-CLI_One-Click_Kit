@@ -19,12 +19,17 @@ function New-FakeSendProvider {
         CloseThrows = $false
         VerifyThrows = $false
         Verify      = $null
+        EmptyAnswer = $true
+        EmptyThrows = $false
     }
     $s.Provider = @{
         Ready      = { [void]$s.Calls.Add('Ready'); $s.Ready }.GetNewClosure()
         Mode       = { [void]$s.Calls.Add('Mode'); $s.Mode }.GetNewClosure()
         Now        = { $s.Now }.GetNewClosure()
         OpenRoom   = { param($name, $caller) [void]$s.Calls.Add(('Open:{0}:{1}' -f $name, $caller)); if ($s.OpenThrows) { throw $s.OpenThrows }; [pscustomobject]@{ Hwnd = 20; Title = $name; OpenedByKit = $s.OpenedByKit } }.GetNewClosure()
+        # 사람이 입력란이 비었다고 답하는 자리. 답은 시험이 정한다(EmptyAnswer). 던지게도 할 수 있다(EmptyThrows).
+        ConfirmInputEmpty = { param($title) [void]$s.Calls.Add(('Confirm:{0}' -f $title)); if ($s.EmptyThrows) { throw 'confirm stopped' }; $s.EmptyAnswer }.GetNewClosure()
+        WaitIdle   = { [void]$s.Calls.Add('WaitIdle') }.GetNewClosure()
         FocusInput = { param($hwnd, $title) [void]$s.Calls.Add(('Focus:{0}:{1}' -f $hwnd, $title)); if ($s.FocusThrows) { throw 'focus stopped' } }.GetNewClosure()
         LockHeld   = { [void]$s.Calls.Add('LockHeld'); $s.LockHeld }.GetNewClosure()
         # 키가 나가기 전에 멈추면 KeysSent 를 켜지 않고 던진다. 키가 나간 뒤 멈추면 KeysSent 를 켜고 던진다.
@@ -36,8 +41,9 @@ function New-FakeSendProvider {
 }
 
 function Set-TestRooms([object[]]$Rooms) { Save-KitConfig -Config ([pscustomobject]@{ version = 1; consentAcceptedAt = $null; lastRoom = $null; rooms = $Rooms }) }
-function New-TestRoom([string]$Name, [bool]$AiSend = $false, [bool]$Verified = $true, [bool]$CanSend = $true) {
-    [pscustomobject]@{ name = $Name; type = 'open'; verified = $Verified; canRead = $true; canSend = $CanSend; selfOnly = $true; aiRead = $false; aiSend = $AiSend }
+# NoDraft 기본값이 참인 것은 기존 시험이 "초안 없음 표시가 된 방"에서 원래 뜻대로 돌게 하려는 것이다. 새 시험은 -NoDraft $false 를 직접 쓴다.
+function New-TestRoom([string]$Name, [bool]$AiSend = $false, [bool]$Verified = $true, [bool]$CanSend = $true, [bool]$NoDraft = $true) {
+    [pscustomobject]@{ name = $Name; type = 'open'; verified = $Verified; canRead = $true; canSend = $CanSend; selfOnly = $true; aiRead = $false; aiSend = $AiSend; noDraft = $NoDraft }
 }
 # 방을 열거나 키를 누르는 "입력이 나가는" 호출만 센다(Ready·Mode·Verify 는 읽기라 세지 않는다).
 function Get-SendInputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Open:*' -or $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' -or $_ -like 'Close:*' }) }
@@ -624,5 +630,111 @@ Describe 'Send: 소스 규칙 (키·클릭·창 닫기)' {
 
     It 'has no parameter that takes the message body into the log (the log call has no text)' {
         $script:sendText | Should Not Match 'Write-KitLog[^\r\n]*\$Text'
+    }
+}
+
+
+Describe 'Send: 입력란이 비었다는 확인 (4번 시험: 닫았다 열어도 초안이 남는다)' {
+    It 'an AI caller is refused (exit 1, no input, nothing recorded) in a room the person has not marked as draft-free' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom 'AI방' -AiSend $true -NoDraft $false))
+            $f = New-FakeSendProvider
+            $e = Get-ThrownError { Send-KakaoMessage -Room 'AI방' -Text 'hi' -Yes -Caller 'ai' -AttemptId 'ai-0100' -Provider $f.Provider }
+            $e.GetType().Name | Should Be 'KakaoKitException'
+            $e.ExitCode | Should Be 1
+            (Get-SendInputCalls $f).Count | Should Be 0
+            (Test-Path -LiteralPath (Get-StateFilePath)) | Should Be $false
+        }
+    }
+
+    It 'the dry run of an AI caller is refused too, so a preview never promises what a real send would refuse' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom 'AI방' -AiSend $true -NoDraft $false))
+            $f = New-FakeSendProvider
+            (Get-ThrownError { Send-KakaoMessage -Room 'AI방' -Text 'hi' -DryRun -Caller 'ai' -AttemptId 'ai-0101' -Provider $f.Provider }).ExitCode | Should Be 1
+            (Get-SendInputCalls $f).Count | Should Be 0
+        }
+    }
+
+    It 'an AI caller sends in a draft-free room and nobody is asked' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom 'AI방' -AiSend $true -NoDraft $true))
+            $f = New-FakeSendProvider
+            (Send-KakaoMessage -Room 'AI방' -Text 'hi' -Yes -Caller 'ai' -AttemptId 'ai-0102' -Provider $f.Provider).Sent | Should Be $true
+            @($f.Calls | Where-Object { $_ -like 'Confirm:*' }).Count | Should Be 0
+        }
+    }
+
+    It 'only a real JSON true counts as draft-free ("true", 1 and missing do not)' {
+        Use-TempHome {
+            foreach ($bad in '"true"', '1', '[true]', 'null') {
+                $raw = '{"version":1,"rooms":[{"name":"AI방","type":"open","verified":true,"canRead":true,"canSend":true,"selfOnly":true,"aiRead":false,"aiSend":true,"noDraft":' + $bad + '}]}'
+                $p = Get-KitPaths
+                New-Item -ItemType Directory -Path $p.DataDir -Force | Out-Null
+                [System.IO.File]::WriteAllText($p.ConfigFile, $raw, (New-Object System.Text.UTF8Encoding($false)))
+                $f = New-FakeSendProvider
+                (Get-ThrownError { Send-KakaoMessage -Room 'AI방' -Text 'hi' -Yes -Caller 'ai' -AttemptId 'ai-0103' -Provider $f.Provider }).ExitCode | Should Be 1
+                (Get-SendInputCalls $f).Count | Should Be 0
+            }
+            # 항목이 아예 없는(예전에 만든) 방도 막힌다.
+            $raw = '{"version":1,"rooms":[{"name":"AI방","type":"open","verified":true,"canRead":true,"canSend":true,"selfOnly":true,"aiRead":false,"aiSend":true}]}'
+            [System.IO.File]::WriteAllText((Get-KitPaths).ConfigFile, $raw, (New-Object System.Text.UTF8Encoding($false)))
+            $f = New-FakeSendProvider
+            (Get-ThrownError { Send-KakaoMessage -Room 'AI방' -Text 'hi' -Yes -Caller 'ai' -AttemptId 'ai-0104' -Provider $f.Provider }).ExitCode | Should Be 1
+        }
+    }
+
+    It 'a person is asked after the room is opened and before the input box is touched; "yes" goes on to send' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            (Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider).Sent | Should Be $true
+            $order = @($f.Calls | Where-Object { $_ -like 'Open:*' -or $_ -like 'Confirm:*' -or $_ -eq 'WaitIdle' -or $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' })
+            ($order -join '|') | Should Be 'Open:테스트방:human|Confirm:테스트방|WaitIdle|Focus:20:테스트방|PasteEnter:20:테스트방'
+        }
+    }
+
+    It 'anything but a real true answer stops with exit 2: no focus, no keys, and the window the kit opened is closed' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방' -NoDraft $false))
+            $minutes = 0
+            foreach ($answer in $false, $null, 'y', 'true', 1, @($true, $true)) {
+                $f = New-FakeSendProvider
+                $f.Now = $f.Now.AddMinutes($minutes); $minutes += 5
+                $f.EmptyAnswer = $answer
+                $e = Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider }
+                $e.GetType().Name | Should Be 'KakaoKitException'
+                $e.ExitCode | Should Be 2
+                @($f.Calls | Where-Object { $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' }).Count | Should Be 0
+                @($f.Calls | Where-Object { $_ -like 'Close:*' }).Count | Should Be 1
+            }
+        }
+    }
+
+    It 'a question that fails (no keyboard, error) stops before any key, and the person is not treated as having said yes' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            $f.EmptyThrows = $true
+            (Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider }) | Should Not BeNullOrEmpty
+            @($f.Calls | Where-Object { $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' }).Count | Should Be 0
+        }
+    }
+
+    It 'a window that was already open is still refused before anybody is asked' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            $f.OpenedByKit = $false
+            (Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider }).ExitCode | Should Be 2
+            @($f.Calls | Where-Object { $_ -like 'Confirm:*' }).Count | Should Be 0
+        }
+    }
+
+    It 'the real provider asks a person, with a keyboard, and takes only y or Y as yes' {
+        $p = Get-DefaultSendProvider
+        $p.ContainsKey('ConfirmInputEmpty') | Should Be $true
+        $p.ContainsKey('WaitIdle') | Should Be $true
+        $p.ContainsKey('NoDraftRoom') | Should Be $false
     }
 }

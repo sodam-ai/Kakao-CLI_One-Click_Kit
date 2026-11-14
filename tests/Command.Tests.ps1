@@ -18,6 +18,9 @@ function New-FakeCmdProvider {
         # GetNewClosure 로 만든 블록은 $script: 가 모듈 쪽을 가리켜 실행 잠금을 볼 수 없다. 그래서 일부러 닫지 않은 블록으로 만든다.
         LockHeld   = [scriptblock]::Create('$held = ($null -ne $script:KitLockMutex); $global:KitCmdTestLockSeen = $held; $held')
         OpenRoom   = { param($name, $caller) [void]$s.Calls.Add(('Open:{0}:{1}' -f $name, $caller)); [pscustomobject]@{ Hwnd = 20; Title = $name; OpenedByKit = $true } }.GetNewClosure()
+        # 사람이 보낼 때 묻는 "입력란이 비었습니까?"에는 예로 답한다(이 파일의 시험은 명령 계층만 본다. 묻는 동작 자체는 Send.Tests 가 본다).
+        ConfirmInputEmpty = { param($title) $true }.GetNewClosure()
+        WaitIdle   = { }.GetNewClosure()
         FocusInput = { param($hwnd, $title) [void]$s.Calls.Add('Focus') }.GetNewClosure()
         PasteEnter = { param($hwnd, $text, $title, $progress) [void]$s.Bodies.Add($text); [void]$s.Calls.Add('PasteEnter'); $progress.KeysSent = $true }.GetNewClosure()
         VerifySent = { param($room, $text, $attemptId) $s.Verify }.GetNewClosure()
@@ -28,7 +31,7 @@ function New-FakeCmdProvider {
 
 function Set-CmdRooms([object[]]$Rooms) { Save-KitConfig -Config ([pscustomobject]@{ version = 1; consentAcceptedAt = $null; lastRoom = $null; rooms = $Rooms }) }
 function New-CmdRoom([string]$Name, [bool]$AiSend = $true) {
-    [pscustomobject]@{ name = $Name; type = 'open'; verified = $true; canRead = $true; canSend = $true; selfOnly = $true; aiRead = $false; aiSend = $AiSend }
+    [pscustomobject]@{ name = $Name; type = 'open'; verified = $true; canRead = $true; canSend = $true; selfOnly = $true; aiRead = $false; aiSend = $AiSend; noDraft = $true }
 }
 function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Open:*' -or $_ -eq 'Focus' -or $_ -eq 'PasteEnter' -or $_ -eq 'Close' }) }
 

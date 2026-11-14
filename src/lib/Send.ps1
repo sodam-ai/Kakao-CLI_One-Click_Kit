@@ -10,8 +10,9 @@
 #
 # 풀기 전의 관문(Ready 를 참으로 바꾸기 전에 실제 카카오톡으로 확인해야 하는 것, 모두 미확인):
 #   (1) 입력란 위치(비례 좌표)와 방 창을 열었을 때 입력란에 바로 입력되는지
-#   (2) 카카오톡이 방 창을 닫은 뒤에도 쓰다 만 글(초안)을 남기는지, 창을 파괴하지 않고 숨기기만 하는지(그러면 "키트가 연 창"이 낡은 창일 수 있다)
-#   (3) 여러 줄·이모지·긴 글이 붙여넣기로 그대로 들어가는지, 기다리는 시간(0.8초)이 충분한지
+#   (2) 시험 완료(2026-11-14, 5342): 방 창을 닫았다 열어도 쓰다 만 글(초안)이 남는다. 그래서 위의 "입력란이 비었다는 확인"을 둔다:
+#       사람이 보내면 방을 연 뒤 y/N 으로 묻고, AI 가 보내면 사람이 미리 noDraft 로 표시한 방에만 보낸다.
+#   (3) 시험 완료(2026-11-14~15, 5342, 같은 방·배율 100%): 한 줄·여러 줄·이모지가 붙여넣기로 그대로 들어가고, 0.8초 대기 뒤 클립보드가 원래대로 돌아온다.
 
 $script:SendMaxLength = 1000
 $script:SendMinIntervalSeconds = 2
@@ -31,6 +32,14 @@ function Get-DefaultSendProvider {
         # 명령 계층이 Enter-KitLock 으로 잡은 실행 잠금을 이 프로세스가 쥐고 있는가.
         LockHeld   = { $null -ne $script:KitLockMutex }
         OpenRoom   = { param($name, $caller) Open-KakaoRoom -Name $name -Caller $caller -Action 'send' }
+        # 사람에게 "입력란이 비었습니까?"를 묻는다. 사람이 키보드 앞에 있을 때만 통과하고, y/Y 만 "예"다(그 밖의 모든 답은 "아니오").
+        # 카카오톡은 방 창을 닫았다 열어도 쓰다 만 글을 남기고(2026-11-14 시험), 키트는 지우는 키를 쓸 수 없어서 비어 있는지 스스로 알 수 없다.
+        ConfirmInputEmpty = { param($title)
+            Assert-HumanPath -Human
+            $answer = Read-Host (Get-Msg -Key 'send.askEmpty' -FormatArgs @($title))
+            return ([string]$answer -ceq 'y' -or [string]$answer -ceq 'Y') }
+        # 사람에게 물은 뒤에는 키보드 사용 기준이 어긋나므로(답을 친 것이 "사람 손"으로 잡힌다) 다시 손이 떨어질 때까지 기다려 기준을 잡는다.
+        WaitIdle   = { Wait-UserIdle -Seconds 2 -TimeoutSeconds 10 }
         FocusInput = { param($hwnd, $title) throw (New-KitError -Key 'send.notReady' -ExitCode 3) }
         # 블록을 닫지 않는다(클로저 금지): 닫힌 블록은 전역 함수만 보여서 스크립트 안에서 불러온 실제 실행에서 Send-KeyCombo 를 못 찾는다(S5 에서 확인).
         # $progress.KeysSent 는 Ctrl+V 가 실제로 나간 뒤에만 참이 된다. 그 전에 멈추면 "실패", 그 뒤에 멈추면 "불명"이다.
@@ -159,6 +168,8 @@ function Send-KakaoMessage {
         if (-not (Test-RoomAllowed -Name $Room -Action 'send' -Caller $Caller)) {
             throw (New-KitError -Key 'room.notAllowed' -FormatArgs @($Room) -ExitCode 1)
         }
+        # AI 는 사람에게 "입력란이 비었습니까?"를 물을 수 없다. 그래서 사람이 미리 "이 방에는 쓰다 만 글을 남기지 않는다"고 표시한 방에만 보낸다.
+        if ($Caller -ceq 'ai' -and -not (Test-RoomNoDraft -Name $Room)) { throw (New-KitError -Key 'send.draftUnknown' -ExitCode 1) }
         # 부르는 쪽이 넘긴 글자가 아니라 설정에 저장된 방 이름을 쓴다.
         $title = [string](Find-Room -Config (Get-KitConfig) -Name $Room).name
 
@@ -185,6 +196,15 @@ function Send-KakaoMessage {
         try {
             # 이미 열려 있던 창에는 보내지 않는다: 입력란에 쓰다 만 글이 있는지 확인할 방법이 없다(설계서 13.2). 그 창은 닫지도 않는다.
             if (-not $opened.OpenedByKit) { throw (New-KitError -Key 'send.alreadyOpen' -ExitCode 2) }
+            # 키트가 새로 연 창에도 이전 초안이 남아 있을 수 있다. 사람이 보내면 방을 연 뒤, 입력란을 건드리기 전에 사람에게 묻는다.
+            # 진짜 true 하나일 때만 "예"다. 물음이 실패하거나(키보드 없음 등) 다른 답이면 키를 하나도 보내지 않고 멈춘다.
+            if ($Caller -ceq 'human') {
+                $emptyAnswer = @(& $Provider.ConfirmInputEmpty $title)
+                if ($emptyAnswer.Count -ne 1 -or $emptyAnswer[0] -isnot [bool] -or $emptyAnswer[0] -ne $true) {
+                    throw (New-KitError -Key 'send.draftNotConfirmed' -ExitCode 2)
+                }
+                & $Provider.WaitIdle
+            }
             [void](& $Provider.FocusInput ([long]$opened.Hwnd) $title)
 
             # 키가 하나라도 나갔으면 중간에 멈춰도 오류가 아니라 '불명'이고 다시 시도하지 않는다. 하나도 안 나갔으면 "실패"(예외)다.
