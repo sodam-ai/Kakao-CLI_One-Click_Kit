@@ -798,6 +798,20 @@ Describe 'Send: 입력란을 읽어서 초안이 보이면 멈춘다 (UI 자동�
         }
     }
 
+    It 'a draft is never missed because of stray output: if any returned value says draft, it stops' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false))
+            $minutes = 0
+            foreach ($odd in @(@('noise', 'draft'), @('draft', 'empty'), @('empty', 'draft', 'unknown'), @(1, 'draft'))) {
+                $f = New-FakeSendProvider
+                $f.Now = $f.Now.AddMinutes($minutes); $minutes += 5
+                $f.InputState = $odd
+                (Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f.Provider }).ExitCode | Should Be 2
+                @($f.Calls | Where-Object { $_ -like 'Confirm:*' -or $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' }).Count | Should Be 0
+            }
+        }
+    }
+
     It 'reads the box after the room is opened and before anybody is asked or any key is sent' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false))

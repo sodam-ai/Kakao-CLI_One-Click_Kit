@@ -199,9 +199,11 @@ function Send-KakaoMessage {
             # 이미 열려 있던 창에는 보내지 않는다: 입력란에 쓰다 만 글이 있는지 확인할 방법이 없다(설계서 13.2). 그 창은 닫지도 않는다.
             if (-not $opened.OpenedByKit) { throw (New-KitError -Key 'send.alreadyOpen' -ExitCode 2) }
             # 입력란을 읽어서 쓰다 만 글이 보이면 사람·AI 모두 키를 하나도 보내지 않고 멈춘다. 못 읽으면(unknown) 이 확인만 건너뛰고 아래 확인은 그대로 한다.
-            $inputState = 'unknown'
-            try { $inputState = [string]@(& $Provider.ReadInputState ([long]$opened.Hwnd) $title)[0] } catch { $inputState = 'unknown' }
-            if ($inputState -ceq 'draft') { throw (New-KitError -Key 'send.draftFound' -ExitCode 2) }
+            # 돌려준 값 중 하나라도 draft 면 멈춘다(앞에 다른 출력이 끼어도 초안을 놓치지 않게 첫 값만 보지 않는다).
+            $inputStates = @()
+            try { $inputStates = @(& $Provider.ReadInputState ([long]$opened.Hwnd) $title) } catch { $inputStates = @() }
+            # 글자일 때만 비교한다: 배열 비교는 다른 형(예: 참/거짓)을 글자로 바꿔 우연히 같다고 볼 수 있다.
+            if (@($inputStates | Where-Object { $_ -is [string] -and [string]::Equals($_, 'draft', [System.StringComparison]::Ordinal) }).Count -gt 0) { throw (New-KitError -Key 'send.draftFound' -ExitCode 2) }
             # 키트가 새로 연 창에도 이전 초안이 남아 있을 수 있다. 사람이 보내면 방을 연 뒤, 입력란을 건드리기 전에 사람에게 묻는다.
             # 진짜 true 하나일 때만 "예"다. 물음이 실패하거나(키보드 없음 등) 다른 답이면 키를 하나도 보내지 않고 멈춘다.
             if ($Caller -ceq 'human') {
