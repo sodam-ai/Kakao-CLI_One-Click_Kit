@@ -21,6 +21,8 @@ function New-FakeSendProvider {
         Verify      = $null
         EmptyAnswer = $true
         EmptyThrows = $false
+        InputState  = 'unknown'
+        InputThrows = $false
     }
     $s.Provider = @{
         Ready      = { [void]$s.Calls.Add('Ready'); $s.Ready }.GetNewClosure()
@@ -30,6 +32,8 @@ function New-FakeSendProvider {
         # 사람이 입력란이 비었다고 답하는 자리. 답은 시험이 정한다(EmptyAnswer). 던지게도 할 수 있다(EmptyThrows).
         ConfirmInputEmpty = { param($title) [void]$s.Calls.Add(('Confirm:{0}' -f $title)); if ($s.EmptyThrows) { throw 'confirm stopped' }; $s.EmptyAnswer }.GetNewClosure()
         WaitIdle   = { [void]$s.Calls.Add('WaitIdle') }.GetNewClosure()
+        # 입력란을 읽기만 해서 empty / draft / unknown 을 돌려주는 자리. 던지게도 할 수 있다(InputThrows).
+        ReadInputState = { param($hwnd, $title) [void]$s.Calls.Add('ReadInput'); if ($s.InputThrows) { throw 'read failed' }; $s.InputState }.GetNewClosure()
         FocusInput = { param($hwnd, $title) [void]$s.Calls.Add(('Focus:{0}:{1}' -f $hwnd, $title)); if ($s.FocusThrows) { throw 'focus stopped' } }.GetNewClosure()
         LockHeld   = { [void]$s.Calls.Add('LockHeld'); $s.LockHeld }.GetNewClosure()
         # 키가 나가기 전에 멈추면 KeysSent 를 켜지 않고 던진다. 키가 나간 뒤 멈추면 KeysSent 를 켜고 던진다.
@@ -736,5 +740,88 @@ Describe 'Send: 입력란이 비었다는 확인 (4번 시험: 닫았다 열어�
         $p.ContainsKey('ConfirmInputEmpty') | Should Be $true
         $p.ContainsKey('WaitIdle') | Should Be $true
         $p.ContainsKey('NoDraftRoom') | Should Be $false
+    }
+}
+
+Describe 'Send: 입력란을 읽어서 초안이 보이면 멈춘다 (UI 자동화, 읽기만)' {
+    It 'stops with exit 2 when the box holds a draft: nobody is asked, no focus, no keys, the window the kit opened is closed (person and AI alike)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false), (New-TestRoom 'AI방' -AiSend $true -NoDraft $true))
+            $minutes = 0
+            foreach ($case in @(@('human', '사람방'), @('ai', 'AI방'))) {
+                $f = New-FakeSendProvider
+                $f.Now = $f.Now.AddMinutes($minutes); $minutes += 5
+                $f.InputState = 'draft'
+                $e = Get-ThrownError { Send-KakaoMessage -Caller $case[0] -Room $case[1] -Text 'hi' -Yes -AttemptId ('draft-' + $case[0]) -Provider $f.Provider }
+                $e.GetType().Name | Should Be 'KakaoKitException'
+                $e.ExitCode | Should Be 2
+                @($f.Calls | Where-Object { $_ -like 'Confirm:*' -or $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' }).Count | Should Be 0
+                @($f.Calls | Where-Object { $_ -like 'Close:*' }).Count | Should Be 1
+            }
+        }
+    }
+
+    It 'goes on when the box reads empty or cannot be read: a person is still asked, an AI still needs the draft-free mark' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false), (New-TestRoom 'AI방' -AiSend $true -NoDraft $true), (New-TestRoom '표시없음' -AiSend $true -NoDraft $false))
+            $minutes = 0
+            foreach ($state in 'empty', 'unknown') {
+                $f = New-FakeSendProvider
+                $f.Now = $f.Now.AddMinutes($minutes); $minutes += 5
+                $f.InputState = $state
+                (Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f.Provider).Sent | Should Be $true
+                @($f.Calls | Where-Object { $_ -like 'Confirm:*' }).Count | Should Be 1
+                $f2 = New-FakeSendProvider
+                $f2.Now = $f.Now.AddMinutes(2)
+                $f2.InputState = $state
+                (Send-KakaoMessage -Caller 'ai' -Room 'AI방' -Text 'hi' -Yes -AttemptId ('ok-' + $state) -Provider $f2.Provider).Sent | Should Be $true
+                $f3 = New-FakeSendProvider
+                $f3.InputState = $state
+                (Get-ThrownError { Send-KakaoMessage -Caller 'ai' -Room '표시없음' -Text 'hi' -Yes -AttemptId ('no-' + $state) -Provider $f3.Provider }).ExitCode | Should Be 1
+                (Get-SendInputCalls $f3).Count | Should Be 0
+            }
+        }
+    }
+
+    It 'a failing or odd read is the same as unknown: it never stops a send by itself and never lets a draft-free check be skipped' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            $f.InputThrows = $true
+            (Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f.Provider).Sent | Should Be $true
+            @($f.Calls | Where-Object { $_ -like 'Confirm:*' }).Count | Should Be 1
+            $f2 = New-FakeSendProvider
+            $f2.Now = $f.Now.AddMinutes(5)
+            $f2.InputState = $true
+            (Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f2.Provider).Sent | Should Be $true
+            @($f2.Calls | Where-Object { $_ -like 'Confirm:*' }).Count | Should Be 1
+        }
+    }
+
+    It 'reads the box after the room is opened and before anybody is asked or any key is sent' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            $f.InputState = 'empty'
+            (Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f.Provider).Sent | Should Be $true
+            $order = @($f.Calls | Where-Object { $_ -like 'Open:*' -or $_ -eq 'ReadInput' -or $_ -like 'Confirm:*' -or $_ -like 'Focus:*' -or $_ -like 'PasteEnter:*' })
+            ($order -join '|') | Should Be 'Open:사람방:human|ReadInput|Confirm:사람방|Focus:20:사람방|PasteEnter:20:사람방'
+        }
+    }
+
+    It 'a window that was already open is still refused before the box is read' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '사람방' -NoDraft $false))
+            $f = New-FakeSendProvider
+            $f.OpenedByKit = $false
+            (Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '사람방' -Text 'hi' -Yes -Provider $f.Provider }).ExitCode | Should Be 2
+            @($f.Calls | Where-Object { $_ -eq 'ReadInput' }).Count | Should Be 0
+        }
+    }
+
+    It 'the real provider reads the box through the read-only helper' {
+        $p = Get-DefaultSendProvider
+        $p.ContainsKey('ReadInputState') | Should Be $true
+        ($p.ReadInputState.ToString()).Contains('Get-KakaoInputState') | Should Be $true
     }
 }

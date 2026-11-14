@@ -32,6 +32,8 @@ function Get-DefaultSendProvider {
         # 명령 계층이 Enter-KitLock 으로 잡은 실행 잠금을 이 프로세스가 쥐고 있는가.
         LockHeld   = { $null -ne $script:KitLockMutex }
         OpenRoom   = { param($name, $caller) Open-KakaoRoom -Name $name -Caller $caller -Action 'send' }
+        # 입력란을 읽기만 해서 empty / draft / unknown 을 돌려준다(키·클릭·쓰기 없음). 읽지 못하면 unknown 이다.
+        ReadInputState = { param($hwnd, $title) Get-KakaoInputState -Hwnd ([long]$hwnd) }
         # 사람에게 "입력란이 비었습니까?"를 묻는다. 사람이 키보드 앞에 있을 때만 통과하고, y/Y 만 "예"다(그 밖의 모든 답은 "아니오").
         # 카카오톡은 방 창을 닫았다 열어도 쓰다 만 글을 남기고(2026-11-14 시험), 키트는 지우는 키를 쓸 수 없어서 비어 있는지 스스로 알 수 없다.
         ConfirmInputEmpty = { param($title)
@@ -196,6 +198,10 @@ function Send-KakaoMessage {
         try {
             # 이미 열려 있던 창에는 보내지 않는다: 입력란에 쓰다 만 글이 있는지 확인할 방법이 없다(설계서 13.2). 그 창은 닫지도 않는다.
             if (-not $opened.OpenedByKit) { throw (New-KitError -Key 'send.alreadyOpen' -ExitCode 2) }
+            # 입력란을 읽어서 쓰다 만 글이 보이면 사람·AI 모두 키를 하나도 보내지 않고 멈춘다. 못 읽으면(unknown) 이 확인만 건너뛰고 아래 확인은 그대로 한다.
+            $inputState = 'unknown'
+            try { $inputState = [string]@(& $Provider.ReadInputState ([long]$opened.Hwnd) $title)[0] } catch { $inputState = 'unknown' }
+            if ($inputState -ceq 'draft') { throw (New-KitError -Key 'send.draftFound' -ExitCode 2) }
             # 키트가 새로 연 창에도 이전 초안이 남아 있을 수 있다. 사람이 보내면 방을 연 뒤, 입력란을 건드리기 전에 사람에게 묻는다.
             # 진짜 true 하나일 때만 "예"다. 물음이 실패하거나(키보드 없음 등) 다른 답이면 키를 하나도 보내지 않고 멈춘다.
             if ($Caller -ceq 'human') {
