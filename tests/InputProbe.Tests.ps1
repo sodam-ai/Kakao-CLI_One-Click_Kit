@@ -80,3 +80,23 @@ Describe 'InputProbe: 읽기만 한다는 약속 (소스 검사)' {
         }
     }
 }
+
+# 입력란에 키보드 포커스가 있는지 "읽기만" 한다(UI 자동화의 HasKeyboardFocus 속성). 포커스를 옮기는 SetFocus·클릭·키는 쓰지 않는다.
+Describe 'InputProbe: 입력란 포커스 읽기 (③-a, 읽기만)' {
+    It 'returns false (never throws) for handles that are not a window' {
+        foreach ($h in 0, -5, 999999999) {
+            $r = Get-KakaoInputFocus -Hwnd $h
+            ($r -is [bool]) | Should Be $true
+            $r | Should Be $false
+        }
+    }
+
+    It 'reads only HasKeyboardFocus and never moves focus, clicks or sends keys' {
+        $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\InputProbe.ps1'))
+        $code = (($text -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        $code.Contains('HasKeyboardFocus') | Should Be $true
+        foreach ($bad in 'SetFocus', 'Invoke(', 'SendKeys', 'SendInput', 'mouse_event', 'SetCursorPos', 'SetForegroundWindow') {
+            $code.IndexOf($bad, [System.StringComparison]::OrdinalIgnoreCase) | Should Be -1
+        }
+    }
+}

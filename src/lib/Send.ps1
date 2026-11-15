@@ -1,5 +1,5 @@
 ﻿# 메시지 보내기(M8)의 안전 틀. 이 파일은 "입력이 나가기 전에 거절해야 하는 것"과 "입력이 나간 뒤의 결과 분류"를 맡는다.
-# 아직 어떤 명령에도 연결되지 않았다. 실제 제공자는 입력란 위치를 측정하기 전이라 일부러 잠겨 있다(Ready = 거짓): 부르면 입력 0 으로 멈춘다.
+# 실제 제공자는 일부러 잠겨 있다: Ready 는 "VerifySent 구현"과 "사람 승인"이 모두 참일 때만 참이고 지금은 둘 다 거짓이라, 부르면 입력 0 으로 멈춘다(종료 코드 3).
 # 이 파일은 작업 전체를 감싸는 잠금(Enter-KitLock)을 잡지 않는다. 부르는 쪽(명령 계층, M11)이 잡아야 하고, 잡지 않았으면 여기서 거절한다
 # (간격·시도 기록의 읽기와 쓰기가 한 덩어리로 안전하려면 한 번에 하나의 실행만 있어야 한다).
 # 필요한 부품: Config(Test-RoomAllowed, Find-Room, Get-KitConfig), Status(Get-KitMode, Assert-SendAllowedByMode), Room, Clip, Guard, Log.
@@ -9,7 +9,8 @@
 # 불명일 때 자동 재시도는 없다: 같은 글을 다시 보내면 중복 전송이 되기 때문이다.
 #
 # 풀기 전의 관문(Ready 를 참으로 바꾸기 전에 실제 카카오톡으로 확인해야 하는 것, 모두 미확인):
-#   (1) 입력란 위치(비례 좌표)와 방 창을 열었을 때 입력란에 바로 입력되는지
+#   (1) 시험 완료(2026-11-15, 5342): 키트가 Enter 로 연 방 창은 입력란이 이미 키보드 포커스를 갖고 있다. 그래서 좌표 클릭 없이 UI 자동화로 포커스를 읽어 확인한다(Confirm-InputFocus).
+#       이 확인의 실제 카카오톡 시험은 열기→보내기→확인→닫기 끝까지 시험(④) 때 한다.
 #   (2) 시험 완료(2026-11-14, 5342): 방 창을 닫았다 열어도 쓰다 만 글(초안)이 남는다. 그래서 위의 "입력란이 비었다는 확인"을 둔다:
 #       사람이 보내면 방을 연 뒤 y/N 으로 묻고, AI 가 보내면 사람이 미리 noDraft 로 표시한 방에만 보낸다.
 #   (3) 시험 완료(2026-11-14~15, 5342, 같은 방·배율 100%): 한 줄·여러 줄·이모지가 붙여넣기로 그대로 들어가고, 0.8초 대기 뒤 클립보드가 원래대로 돌아온다.
@@ -20,13 +21,63 @@ $script:SendAttemptKeep = 100
 # 붙여넣기(Ctrl+V)를 보낸 뒤 클립보드를 되돌리기 전에 기다리는 시간. 카카오톡이 아직 붙여넣기 전인데 사용자의 원래 클립보드 글로 되돌리면
 # 그 글이 대신 전송될 수 있다(위험 R-04). Enter 가 실패해도 기다린다. 값(0.8초)은 측정 전 추정이며 실제 시험에서 확인해야 한다.
 $script:SendSettleMs = 800
+# 입력란이 키보드 포커스를 갖기를 기다리는 시간과 확인 간격(밀리초). 포커스 확인은 읽기만 하며 키·클릭은 없다.
+$script:SendFocusWaitMs = 2000
+$script:SendFocusPollMs = 100
+# Ready(실제 보내기 열기)의 두 조건. 둘 다 거짓으로 출고한다. 참으로 바꾸는 것은 사람 승인 뒤의 별도 작업이다.
+#  - SendVerifySentImplemented: 보낸 글을 방에서 확인하는 일(VerifySent)이 만들어지고 실제로 시험된 뒤에만 참. 없으면 모든 전송이 "불명"이 되어 같은 글을 다시 보내게 된다.
+#  - SendReadyApproved: 방 열기 → 보내기 → 확인 → 닫기 전체를 사람 승인 아래 실제 카카오톡에서 끝까지 시험하고, 사람이 열기로 정한 뒤에만 참.
+$script:SendVerifySentImplemented = $false
+$script:SendReadyApproved = $false
+
+# 아직 채워지지 않은 Ready 조건의 이름 목록('VerifySent', 'Approval'). 비어 있어야 Ready 가 참이다. 참/거짓은 진짜 불리언일 때만 인정한다("true" 글자나 1 은 아니다).
+function Get-SendUnmetReadyConditions {
+    $unmet = @()
+    if (-not ($script:SendVerifySentImplemented -is [bool] -and $script:SendVerifySentImplemented -eq $true)) { $unmet += 'VerifySent' }
+    if (-not ($script:SendReadyApproved -is [bool] -and $script:SendReadyApproved -eq $true)) { $unmet += 'Approval' }
+    return $unmet
+}
+
+# 방 창을 앞으로 올리고 입력란에 키보드 포커스가 있는지 읽어 확인한다. 키도 클릭도 하지 않고, 포커스를 직접 옮기지도 않는다(읽기만).
+# 순서: 창 올리기(키 없음) → 맨 앞이 아니면 Wait-KakaoForeground 로 사람이 창을 한 번 눌러 주기를 기다림(안 되면 정지) → 포커스를 짧게 기다리며 확인.
+# 포커스가 확인되지 않으면 입력 0 으로 멈춘다(종료 코드 2). 확인 결과는 진짜 불리언 $true 하나일 때만 인정한다.
+function Confirm-InputFocus {
+    param([Parameter(Mandatory)][long]$Hwnd, [string]$Title, [hashtable]$Provider)
+    $ErrorActionPreference = 'Stop'
+    if (-not $Provider) { $Provider = Get-DefaultFocusProvider }
+    $raised = @(& $Provider.Raise $Hwnd $Title)
+    $front = ($raised.Count -eq 1 -and $raised[0] -is [bool] -and $raised[0] -eq $true)
+    if (-not $front) { [void](& $Provider.WaitForeground $Hwnd) }
+    $start = [long](& $Provider.NowMs)
+    while ($true) {
+        $focused = $false
+        try {
+            $seen = @(& $Provider.HasFocus $Hwnd)
+            $focused = ($seen.Count -eq 1 -and $seen[0] -is [bool] -and $seen[0] -eq $true)
+        }
+        catch { $focused = $false }
+        if ($focused) { return $true }
+        if (([long](& $Provider.NowMs) - $start) -ge $script:SendFocusWaitMs) { throw (New-KitError -Key 'send.noInputFocus' -ExitCode 2) }
+        & $Provider.Sleep $script:SendFocusPollMs
+    }
+}
+
+function Get-DefaultFocusProvider {
+    return @{
+        Raise          = { param($hwnd, $title) Set-KakaoWindowFront -Hwnd ([long]$hwnd) -ExpectedTitle $title }
+        WaitForeground = { param($hwnd) [void](Wait-KakaoForeground -Hwnd ([long]$hwnd)) }
+        HasFocus       = { param($hwnd) Get-KakaoInputFocus -Hwnd ([long]$hwnd) }
+        NowMs          = { [long]([System.Diagnostics.Stopwatch]::GetTimestamp() * 1000 / [System.Diagnostics.Stopwatch]::Frequency) }
+        Sleep          = { param($ms) Start-Sleep -Milliseconds ([int]$ms) }
+    }
+}
 
 # 실제 부품 묶음. 시험은 이 묶음을 가짜로 바꿔 끼운다(Room.ps1 의 제공자와 같은 방식).
 function Get-DefaultSendProvider {
     $ErrorActionPreference = 'Stop'
     return @{
-        # 입력란 위치(비례 좌표)를 아직 측정하지 않았으므로 거짓이다. 측정해서 FocusInput 을 구현한 뒤에만 참으로 바꾼다(사용자 승인 필요).
-        Ready      = { $false }
+        # 두 조건(VerifySent 구현, 사람 승인)이 모두 채워질 때만 참이다. 지금은 둘 다 거짓이라 실제 보내기는 잠겨 있다(Get-SendUnmetReadyConditions).
+        Ready      = { @(Get-SendUnmetReadyConditions).Count -eq 0 }
         Mode       = { Get-KitMode }
         Now        = { [datetime]::UtcNow }
         # 명령 계층이 Enter-KitLock 으로 잡은 실행 잠금을 이 프로세스가 쥐고 있는가.
@@ -42,7 +93,8 @@ function Get-DefaultSendProvider {
             return ([string]$answer -ceq 'y' -or [string]$answer -ceq 'Y') }
         # 사람에게 물은 뒤에는 키보드 사용 기준이 어긋나므로(답을 친 것이 "사람 손"으로 잡힌다) 다시 손이 떨어질 때까지 기다려 기준을 잡는다.
         WaitIdle   = { Wait-UserIdle -Seconds 2 -TimeoutSeconds 10 }
-        FocusInput = { param($hwnd, $title) throw (New-KitError -Key 'send.notReady' -ExitCode 3) }
+        # 클릭 없이 입력란 포커스를 읽어 확인한다(Confirm-InputFocus). 확인되지 않으면 입력 0 으로 멈춘다.
+        FocusInput = { param($hwnd, $title) [void](Confirm-InputFocus -Hwnd ([long]$hwnd) -Title $title) }
         # 블록을 닫지 않는다(클로저 금지): 닫힌 블록은 전역 함수만 보여서 스크립트 안에서 불러온 실제 실행에서 Send-KeyCombo 를 못 찾는다(S5 에서 확인).
         # $progress.KeysSent 는 Ctrl+V 가 실제로 나간 뒤에만 참이 된다. 그 전에 멈추면 "실패", 그 뒤에 멈추면 "불명"이다.
         PasteEnter = { param($hwnd, $text, $title, $progress)

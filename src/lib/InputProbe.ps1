@@ -59,3 +59,24 @@ function Get-KakaoInputState {
     }
     catch { return 'unknown' }
 }
+
+# 방 창(핸들)의 입력란이 지금 키보드 포커스를 갖고 있는지 "읽기만" 한다(HasKeyboardFocus 속성). 포커스를 옮기거나 누르거나 쓰지 않는다.
+# 입력란이 정확히 하나이고 포커스가 있다고 읽힐 때만 $true 다. 못 읽거나 애매하면 $false(= 입력하지 않는 쪽). 어떤 실패도 던지지 않는다.
+# 2026-11-15 확인(5342): 키트가 Enter 로 연 새 방 창은 입력란이 이미 키보드 포커스를 갖고 있었다(클릭 불필요).
+function Get-KakaoInputFocus {
+    param([long]$Hwnd)
+    $ErrorActionPreference = 'Stop'
+    try {
+        if ($Hwnd -le 0) { return $false }
+        Add-Type -AssemblyName UIAutomationClient
+        Add-Type -AssemblyName UIAutomationTypes
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle([System.IntPtr]$Hwnd)
+        if ($null -eq $root) { return $false }
+        $cond = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::ClassNameProperty), $script:KakaoInputClassName
+        $found = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
+        if ($found.Count -ne 1) { return $false }
+        $has = $found[0].GetCurrentPropertyValue([System.Windows.Automation.AutomationElement]::HasKeyboardFocusProperty)
+        return ($has -is [bool] -and $has -eq $true)
+    }
+    catch { return $false }
+}

@@ -136,6 +136,31 @@ function Send-KeyCombo {
     Set-InputBaseline -Provider $Provider
 }
 
+# 키도 클릭도 없이 창만 맨 앞으로 올린다(입력란 포커스 확인 전에 쓴다). 맨 앞이 되면 $true, 3번 올려도 안 되면 $false(오류 아님).
+# 올리기 전에 프로세스·제목이 맞는지 보고(다르면 올리지 않고 멈춤), 다시 올리기 전마다 사람이 손댔는지 본다(손댔으면 창을 다시 빼앗지 않고 멈춤).
+function Set-KakaoWindowFront {
+    param(
+        [Parameter(Mandatory)][long]$Hwnd,
+        [string]$ExpectedTitle,
+        [hashtable]$Provider
+    )
+    $ErrorActionPreference = 'Stop'
+    if ([string]::IsNullOrEmpty($ExpectedTitle)) { throw (New-GuardError -Key 'guard.noExpectedTitle') }
+    if (-not $Provider) { $Provider = Get-DefaultInputProvider }
+    Assert-NoUserInterference -Provider $Provider
+    if ((& $Provider.ProcessName $Hwnd) -ine 'KakaoTalk') { throw (New-GuardError -Key 'guard.processMismatch') }
+    if (-not [string]::Equals([string](& $Provider.Title $Hwnd), $ExpectedTitle, [System.StringComparison]::Ordinal)) {
+        throw (New-GuardError -Key 'guard.titleMismatch' -FormatArgs @($ExpectedTitle))
+    }
+    for ($try = 1; $try -le $script:ForegroundRaiseTries; $try++) {
+        & $Provider.SetForeground $Hwnd
+        & $Provider.Sleep 80
+        if ([long](& $Provider.Foreground) -eq $Hwnd) { return $true }
+        Assert-NoUserInterference -Provider $Provider
+    }
+    return $false
+}
+
 # 창 크기에 비례한 위치(0~1)를 왼쪽 버튼으로 클릭한다. 그 자리의 맨 위 창이 대상 창이 아니면 아무것도 하지 않는다.
 function Invoke-RelClick {
     param(

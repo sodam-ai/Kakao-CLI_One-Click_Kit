@@ -274,7 +274,7 @@ Describe 'SendCommand: kakao.cmd 로 실제 실행 (새 프로세스)' {
         Use-TempHome {
             $r = Invoke-RealCli 'send --room 없는방 --text hello --dry-run'
             $r.ExitCode | Should Be 3
-            $r.Out | Should Match '아직 연결되지 않았습니다'
+            $r.Out | Should Match '아직 열리지 않았습니다'
             Test-Path -LiteralPath ([System.IO.Path]::Combine((Get-KitPaths).DataDir, 'state')) | Should Be $false
         }
     }
@@ -297,7 +297,7 @@ Describe 'SendCommand: 실제 제공자는 잠겨 있다 (입력 0)' {
                     @('--room', '테스트방', '--text', 'hi', '--attempt-id', 'r1', '--yes'))) {
                 $r = Invoke-Send $argv $null
                 $r.Exit | Should Be 3
-                $r.Out | Should Match '아직 연결되지 않았습니다'
+                $r.Out | Should Match '아직 열리지 않았습니다'
             }
             Test-Path -LiteralPath ([System.IO.Path]::Combine((Get-KitPaths).DataDir, 'state', 'send-state.json')) | Should Be $false
         }

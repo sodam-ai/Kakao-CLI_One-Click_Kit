@@ -28,7 +28,7 @@
 | `rooms add\|remove\|set ... --human` | 동작 | **사람만**: `--human` 이 있고 키보드 입력이 막혀 있지 않아야 함 |
 | `read <방> [--since 7d\|12h] [--last N] [--human]` | 연결됨 | 보관된 내보내기가 있어야 함(없으면 종료 코드 3). `export` 는 아직 없음 |
 | `search <낱말> [--room <방>] [--human]` | 연결됨 | 같은 조건 |
-| `send --room <방> (--text <글> \| --file <파일>) [--dry-run] [--yes] [--attempt-id <번호>] [--human]` | **잠김** | 어떤 호출도 종료 코드 3(입력란 위치 미측정). 메뉴에 "보내기"를 넣어도 지금은 실제로 보내지 못함 |
+| `send --room <방> (--text <글> \| --file <파일>) [--dry-run] [--yes] [--attempt-id <번호>] [--human]` | **잠김** | 어떤 호출도 종료 코드 3(보낸 글 확인 장치 없음, 사람 승인 전). 메뉴에 "보내기"를 넣어도 지금은 실제로 보내지 못함 |
 | `help`, `export`, `open`, `update`, `uninstall`, 번호 메뉴 | 없음 | ⏳ 11·12단계 |
 
 ## 메뉴를 만들 때 지켜야 할 것

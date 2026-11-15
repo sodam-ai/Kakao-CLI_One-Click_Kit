@@ -552,3 +552,54 @@ Describe 'Guard: 창 올리기 재시도 (2번 시험 앞 3회 "맨 앞에 없�
         }
     }
 }
+Describe 'Guard: Set-KakaoWindowFront (③, 키·클릭 없이 창만 앞으로)' {
+    It 'raises the window and reports true, sending no key, click or close' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 1
+        (Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider) | Should Be $true
+        $f.SetCount | Should Be 1
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'retries up to 3 times and reports false (not an error) when it never reaches the front' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 4
+        (Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider) | Should Be $false
+        $f.SetCount | Should Be 3
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'does not raise at all when the process or the title is wrong (exit 2)' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Process = 'notepad'
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 0
+        $f2 = New-FakeProvider
+        Initialize-Guard $f2
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '다른방' -Provider $f2.Provider }).ExitCode | Should Be 2
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '' -Provider $f2.Provider }).ExitCode | Should Be 2
+        $f2.SetCount | Should Be 0
+    }
+
+    It 'stops without taking the window back again when the person touched the keyboard or mouse' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 3
+        $f.TickOnSet = 2222
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 1
+    }
+
+    It 'refuses to run without the human-hand baseline' {
+        $f = New-FakeProvider
+        Reset-InputBaseline
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 0
+    }
+}

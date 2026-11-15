@@ -839,3 +839,142 @@ Describe 'Send: 입력란을 읽어서 초안이 보이면 멈춘다 (UI 자동�
         ($p.ReadInputState.ToString()).Contains('Get-KakaoInputState') | Should Be $true
     }
 }
+
+# ③: 클릭 없는 입력란 포커스 확인(Confirm-InputFocus)과 Ready 조건. 가짜 부품만 쓰고 카카오톡은 건드리지 않는다.
+function New-FakeFocusProvider {
+    $stopErr = New-KitError -Key 'guard.notForeground' -ExitCode 2
+    $s = @{ Calls = (New-Object System.Collections.ArrayList); Ms = 0; Front = $true; WaitThrows = $false; RaiseThrows = $false; FocusOnPoll = 1; HasFocusThrows = $false; FocusValue = $true; Polls = 0 }
+    $s.Provider = @{
+        Raise          = { param($hwnd, $title) [void]$s.Calls.Add('Raise'); if ($s.RaiseThrows) { throw $stopErr }; $s.Front }.GetNewClosure()
+        WaitForeground = { param($hwnd) [void]$s.Calls.Add('Wait'); if ($s.WaitThrows) { throw $stopErr } }.GetNewClosure()
+        HasFocus       = { param($hwnd)
+            [void]$s.Calls.Add('HasFocus'); $s.Polls++
+            if ($s.HasFocusThrows) { throw 'uia broke' }
+            if ($s.FocusOnPoll -gt 0 -and $s.Polls -ge $s.FocusOnPoll) { return $s.FocusValue }
+            return $false }.GetNewClosure()
+        NowMs          = { $s.Ms }.GetNewClosure()
+        Sleep          = { param($ms) $s.Ms += $ms }.GetNewClosure()
+    }
+    return $s
+}
+
+Describe 'Send: Confirm-InputFocus (③-a, 클릭 없이 창을 올리고 입력란 포커스를 읽어 확인)' {
+    It 'passes when the window is in front and the input box already has keyboard focus (no waiting for a person)' {
+        $f = New-FakeFocusProvider
+        (Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider) | Should Be $true
+        ($f.Calls -join ',') | Should Be 'Raise,HasFocus'
+    }
+
+    It 'falls back to waiting for the window only when raising did not bring it to the front' {
+        $f = New-FakeFocusProvider
+        $f.Front = $false
+        (Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider) | Should Be $true
+        ($f.Calls -join ',') | Should Be 'Raise,Wait,HasFocus'
+    }
+
+    It 'stops (exit 2) when the window never comes to the front, and never reads the box' {
+        $f = New-FakeFocusProvider
+        $f.Front = $false
+        $f.WaitThrows = $true
+        (Get-ThrownError { Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider }).ExitCode | Should Be 2
+        @($f.Calls | Where-Object { $_ -eq 'HasFocus' }).Count | Should Be 0
+    }
+
+    It 'lets an error from raising pass through unchanged' {
+        $f = New-FakeFocusProvider
+        $f.RaiseThrows = $true
+        (Get-ThrownError { Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider }).ExitCode | Should Be 2
+        @($f.Calls | Where-Object { $_ -eq 'HasFocus' }).Count | Should Be 0
+    }
+
+    It 'waits a short while for the focus to arrive (focus on the 5th look is still fine)' {
+        $f = New-FakeFocusProvider
+        $f.FocusOnPoll = 5
+        (Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider) | Should Be $true
+        $f.Polls | Should Be 5
+    }
+
+    It 'stops with exit 2 and a clear message when the box never gets focus, after a bounded number of looks' {
+        $f = New-FakeFocusProvider
+        $f.FocusOnPoll = 0
+        $e = Get-ThrownError { Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider }
+        $e.ExitCode | Should Be 2
+        $e.Message | Should Match '포커스'
+        $e.Message | Should Match '입력하지 않았습니다'
+        ($f.Polls -ge 2) | Should Be $true
+        ($f.Polls -le 40) | Should Be $true
+        ($f.Ms -le 3000) | Should Be $true
+    }
+
+    It 'treats a failing read as "no focus" (stops with exit 2, never crashes in another way)' {
+        $f = New-FakeFocusProvider
+        $f.HasFocusThrows = $true
+        (Get-ThrownError { Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider }).ExitCode | Should Be 2
+    }
+
+    It 'counts only a real boolean true as focus (a text "true", 1 or stray output does not pass)' {
+        foreach ($junk in 'true', 1, 'yes', @('noise', $true)) {
+            $f = New-FakeFocusProvider
+            $f.FocusValue = $junk
+            (Get-ThrownError { Confirm-InputFocus -Hwnd 100 -Title '방' -Provider $f.Provider }).ExitCode | Should Be 2
+        }
+    }
+
+    It 'the real provider uses it (no longer the always-stop stub) and the code never moves focus itself, clicks or sends keys' {
+        $p = Get-DefaultSendProvider
+        ($p.FocusInput.ToString()).Contains('Confirm-InputFocus') | Should Be $true
+        $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\Send.ps1'))
+        $start = $text.IndexOf('function Confirm-InputFocus')
+        $start | Should BeGreaterThan -1
+        $body = $text.Substring($start)
+        $end = $body.IndexOf("`nfunction ", 10)
+        if ($end -gt 0) { $body = $body.Substring(0, $end) }
+        $code = (($body -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        foreach ($bad in 'SetFocus', 'Send-KeyCombo', 'Invoke-RelClick', 'SendKeys', 'mouse_event') {
+            $code.IndexOf($bad, [System.StringComparison]::OrdinalIgnoreCase) | Should Be -1
+        }
+    }
+}
+
+Describe 'Send: Ready 조건 함수 (③-b, 기본은 계속 꺼 둔다)' {
+    It 'lists what is still missing, and real sending stays locked while anything is missing' {
+        $unmet = @(Get-SendUnmetReadyConditions)
+        ($unmet -contains 'VerifySent') | Should Be $true
+        ($unmet -contains 'Approval') | Should Be $true
+        $p = Get-DefaultSendProvider
+        [bool](& $p.Ready) | Should Be $false
+    }
+
+    It 'stays locked when only one of the two conditions is met, and opens only when both are' {
+        $oldV = $script:SendVerifySentImplemented
+        $oldA = $script:SendReadyApproved
+        try {
+            $p = Get-DefaultSendProvider
+            $script:SendVerifySentImplemented = $true; $script:SendReadyApproved = $false
+            [bool](& $p.Ready) | Should Be $false
+            $script:SendVerifySentImplemented = $false; $script:SendReadyApproved = $true
+            [bool](& $p.Ready) | Should Be $false
+            $script:SendVerifySentImplemented = $true; $script:SendReadyApproved = $true
+            [bool](& $p.Ready) | Should Be $true
+            @(Get-SendUnmetReadyConditions).Count | Should Be 0
+        }
+        finally { $script:SendVerifySentImplemented = $oldV; $script:SendReadyApproved = $oldA }
+    }
+
+    It 'only the exact boolean true opens it (text "true" or 1 does not)' {
+        $oldV = $script:SendVerifySentImplemented
+        $oldA = $script:SendReadyApproved
+        try {
+            $p = Get-DefaultSendProvider
+            $script:SendVerifySentImplemented = 'true'; $script:SendReadyApproved = 1
+            [bool](& $p.Ready) | Should Be $false
+        }
+        finally { $script:SendVerifySentImplemented = $oldV; $script:SendReadyApproved = $oldA }
+    }
+
+    It 'both switches ship as false in the source' {
+        $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\Send.ps1'))
+        $text | Should Match '\$script:SendVerifySentImplemented\s*=\s*\$false'
+        $text | Should Match '\$script:SendReadyApproved\s*=\s*\$false'
+    }
+}
