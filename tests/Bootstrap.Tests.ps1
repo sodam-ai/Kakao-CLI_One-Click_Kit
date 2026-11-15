@@ -245,7 +245,7 @@ Describe 'Bootstrap: kakao.cmd' {
         $r = Invoke-Cli @('help')
         $r.ExitCode | Should Be 0
         $r.Out | Should Match '카카오톡 키트 사용법'
-        foreach ($c in 'open', 'export', 'update', 'uninstall', 'menu') {
+        foreach ($c in 'export', 'update', 'uninstall', 'menu') {
             # 아직 없는 명령은 "준비 중" 줄에만 있어야 하고, 쓸 수 있는 명령 줄로 나오면 안 된다.
             $r.Out | Should Match ('준비 중인 기능.*' + $c)
             @($r.Out -split "`r?`n" | Where-Object { $_ -match ('^\s+' + $c + '\s') }).Count | Should Be 0

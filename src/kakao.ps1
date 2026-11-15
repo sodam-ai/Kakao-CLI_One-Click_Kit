@@ -24,10 +24,17 @@ function Invoke-KakaoCommand {
                 Write-Host (Get-Msg -Key 'help.extraArgs')
                 return 1
             }
-            foreach ($key in 'help.title', 'help.version', 'help.status', 'help.rooms', 'help.read', 'help.search', 'help.send', 'help.help', 'help.soon') {
+            foreach ($key in 'help.title', 'help.version', 'help.status', 'help.rooms', 'help.open', 'help.read', 'help.search', 'help.send', 'help.help', 'help.soon') {
                 Write-Host (Get-Msg -Key $key)
             }
             return 0
+        }
+        'open' {
+            # 방 열기에 필요한 부품은 이 명령일 때만 불러온다. 허용 목록에 있는 방을 열어 창 제목을 확인하고 닫는다(글을 쓰거나 보내지 않는다).
+            foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'InputProbe', 'OpenCommand') {
+                . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+            }
+            return (Invoke-OpenCommand -Argv @($Argv | Select-Object -Skip 1))
         }
         'send' {
             # 보내기에 필요한 부품은 이 명령일 때만 불러온다(version 등 다른 명령은 카카오톡 관련 부품을 건드리지 않는다).
