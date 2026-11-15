@@ -56,7 +56,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <div class="table-wrap"><table>
 <thead><tr><th>What you may wonder</th><th>Answer</th></tr></thead>
 <tbody>
-<tr><td>Commands you can use now</td><td><code>kakao version</code> and <code>kakao help</code> (shows the usage). (<code>kakao status</code>, <code>rooms</code>, <code>read</code> and <code>search</code> have only a command line connected that does not operate KakaoTalk, and <code>read</code> and <code>search</code> have data only after <code>export</code> is built. <code>kakao open</code> opens an allowed room, checks the window title and closes it; it sends keys to KakaoTalk, so its command line is checked only with fake parts and it has never opened real KakaoTalk through this command. <code>kakao send</code> has sending locked and sends nothing.)</td></tr>
+<tr><td>Commands you can use now</td><td><code>kakao version</code> and <code>kakao help</code> (shows the usage). (<code>kakao status</code>, <code>rooms</code>, <code>read</code> and <code>search</code> have only a command line connected that does not operate KakaoTalk, and <code>read</code> and <code>search</code> have data only after <code>export</code> is built. <code>kakao open</code> opens an allowed room, checks the window title and closes it; it sends keys to KakaoTalk, so its command line is checked with fake parts and then once in real KakaoTalk (2026-11-15, 100%, chat tab, test room; one run only, so its stability is unconfirmed). <code>kakao send</code> has sending locked and sends nothing.)</td></tr>
 <tr><td>Sending messages, reading chats</td><td>Not yet. Reading is built first, sending after it (Chapter 2).</td></tr>
 <tr><td>Setup and preparation</td><td>Copy the folder and you are done. No installer, no sign-up, no administrator rights and no internet are needed (Chapters 3-4).</td></tr>
 <tr><td>Who uses it</td><td>As the owner decided, it is used <strong>for personal use only</strong>. It is tested only with your own account, on your own computer, in a room where you are alone, and it is not published, distributed or sold (Chapter 17).</td></tr>
@@ -406,7 +406,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tbody>
 <tr><td><code>kakao version</code></td><td>✅ Available</td><td>Shows the kit version. Output: <code>카카오톡 키트 1.0.0</code></td><td>1</td></tr>
 <tr><td><code>kakao help</code></td><td>✅ Available</td><td>Shows the commands you can use and, separately, the features that do not exist yet ("in preparation"). Does not touch KakaoTalk, the settings or the records. Adding any word after it is exit code 1.</td><td>11</td></tr>
-<tr><td><code>kakao open --room &lt;room&gt; [--human]</code></td><td>✅ Command connected (checked with fake parts only)</td><td>Opens a room that is word for word on the allowed list, checks that the window title is exactly the room name, and closes the window if the kit opened it (a window that was already open is left alone). It writes and sends nothing and moves only within the allowed keys (<code>Ctrl+F</code>, <code>Ctrl+V</code>, <code>Enter</code>, and <code>Esc</code> only to close the search in the main window). Without <code>--human</code> it is treated as an AI and refused when the room's AI-reading switch is off. It has never opened real KakaoTalk through this command (the room-opening part itself was checked for real). The consent screen is connected in step 12, so there is no consent check yet.</td><td>7</td></tr>
+<tr><td><code>kakao open --room &lt;room&gt; [--human]</code></td><td>✅ Command connected (checked once for real)</td><td>Opens a room that is word for word on the allowed list, checks that the window title is exactly the room name, and closes the window if the kit opened it (a window that was already open is left alone). It writes and sends nothing and moves only within the allowed keys (<code>Ctrl+F</code>, <code>Ctrl+V</code>, <code>Enter</code>, and <code>Esc</code> only to close the search in the main window). Without <code>--human</code> it is treated as an AI and refused when the room's AI-reading switch is off. Through this command it passed once in real KakaoTalk on 2026-11-15 (one test room, open → check title → close, exit code 0, the window list was the same as at the start afterwards). It was one run only, so repeat stability, 150% scaling, other tabs and ordinary rooms are unconfirmed. The consent screen is connected in step 12, so there is no consent check yet.</td><td>7</td></tr>
 <tr><td><code>kakao help</code></td><td>⏳ Planned</td><td>Shows Korean help with examples.</td><td>11</td></tr>
 <tr><td><code>kakao status</code></td><td>✅ Available (minimal)</td><td>Only reads and shows the kit version, the KakaoTalk version and whether it is running, the sending mode (full / read-only), the number of allowed rooms and of rooms with AI permission, and whether sending is locked. The login state, monitor scaling and recent errors are added in step 10.</td><td>10</td></tr>
 <tr><td><code>kakao rooms (list | add | remove | set)</code></td><td>✅ Available</td><td>Manages allowed rooms: <code>rooms list</code>, <code>rooms add &lt;room&gt; --type open|self|normal [--self-only] --human</code>, <code>rooms remove &lt;room&gt; --human</code>, <code>rooms set &lt;room&gt; &lt;aiRead|aiSend|canSend|noDraft&gt; &lt;on|off&gt; --human</code>. <code>list</code> is for anyone; the rest are for a person only (<code>--human</code> plus keyboard input). The design's "register only when the search shows exactly one exact-name match" needs KakaoTalk to be operated and does not exist yet (⏳); for now <code>add</code> registers by name only, and AI read and send are both off at first.</td><td>11</td></tr>
@@ -736,13 +736,23 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li></ul>
 </details>
 <details>
+<summary><strong>Round O1: `kakao open` checked once for real (2026-11-15)</strong> — test count unchanged (516)</summary>
+<ul>
+<li>With the person's approval ("O1 60초 시작"), the real <code>kakao.cmd open --room &lt;test room&gt;</code> was run once. The settings were created only in a temporary data folder; the real settings were not touched.
+</li>
+<li>Result: exit code 0, about 4.9 seconds; it opened the room, confirmed the window title matched, and closed it. Afterwards the KakaoTalk window list was the same as at the start (5 windows) and the screen was still the chat list. Other windows that were already open were left alone.
+</li>
+<li>Limits: one run only. Repeat stability, 150% scaling, other tabs and ordinary rooms were not checked. The test room's AI-reading switch was turned on only in the temporary settings for this test.
+</li></ul>
+</details>
+<details>
 <summary><strong>Room-opening command `kakao open` connected (2026-11-15)</strong> — tests 499 → 511</summary>
 <ul>
 <li>The room-opening part, already built and checked in real KakaoTalk, is now connected as <code>kakao open --room &lt;room&gt;</code>. The allowed list, the caller (person/AI), the run lock and the exact window-title check are applied again in front of the command, and only the window the kit opened is closed. It writes and sends nothing.
 </li>
 <li>The tests found one real gap: the router's load list for <code>open</code> was missing <code>Status</code>, so the error-report path could not have found a function. Unit tests load every part before running, so they cannot catch this kind of omission; a test now starts a new PowerShell with only the router's list and checks that every kit function the loaded files call exists.
 </li>
-<li>Limits: the command has never opened real KakaoTalk (only the fake-part tests and the real <code>kakao.cmd</code> refusals for a wrong usage and a room not on the list were run). The consent check will be attached to every command together when the first-run screen (step 12) is built.
+<li>Limits: when it was merged the command had never opened real KakaoTalk (only the fake-part tests and the real <code>kakao.cmd</code> refusals for a wrong usage and a room not on the list were run); one real run has been done since (see "Round O1" below). The consent check will be attached to every command together when the first-run screen (step 12) is built.
 </li></ul>
 </details>
 <details>

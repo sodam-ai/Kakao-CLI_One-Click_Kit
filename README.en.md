@@ -19,7 +19,7 @@ Document date: 2026-11-02 · Basis: steps 1-6 done + step 7 chat-room opening an
 
 | What you may wonder | Answer |
 |---|---|
-| Commands you can use now | `kakao version` and `kakao help` (shows the usage). (`kakao status`, `rooms`, `read` and `search` have only a command line connected that does not operate KakaoTalk, and `read` and `search` have data only after `export` is built. `kakao open` opens an allowed room, checks the window title and closes it; it sends keys to KakaoTalk, so its command line is checked only with fake parts and it has never opened real KakaoTalk through this command. `kakao send` has sending locked and sends nothing.) |
+| Commands you can use now | `kakao version` and `kakao help` (shows the usage). (`kakao status`, `rooms`, `read` and `search` have only a command line connected that does not operate KakaoTalk, and `read` and `search` have data only after `export` is built. `kakao open` opens an allowed room, checks the window title and closes it; it sends keys to KakaoTalk, so its command line is checked with fake parts and then once in real KakaoTalk (2026-11-15, 100%, chat tab, test room; one run only, so its stability is unconfirmed). `kakao send` has sending locked and sends nothing.) |
 | Sending messages, reading chats | Not yet. Reading is built first, sending after it (Chapter 2). |
 | Setup and preparation | Copy the folder and you are done. No installer, no sign-up, no administrator rights and no internet are needed (Chapters 3-4). |
 | Who uses it | As the owner decided, it is used **for personal use only**. It is tested only with your own account, on your own computer, in a room where you are alone, and it is not published, distributed or sold (Chapter 17). |
@@ -333,7 +333,7 @@ How to check: in cmd type `echo %errorlevel%`, in PowerShell type `$LASTEXITCODE
 |---|---|---|---|
 | `kakao version` | ✅ Available | Shows the kit version. Output: `카카오톡 키트 1.0.0` | 1 |
 | `kakao help` | ✅ Available | Shows the commands you can use and, separately, the features that do not exist yet ("in preparation"). Does not touch KakaoTalk, the settings or the records. Adding any word after it is exit code 1. | 11 |
-| `kakao open --room <room> [--human]` | ✅ Command connected (checked with fake parts only) | Opens a room that is word for word on the allowed list, checks that the window title is exactly the room name, and closes the window if the kit opened it (a window that was already open is left alone). It writes and sends nothing and moves only within the allowed keys (`Ctrl+F`, `Ctrl+V`, `Enter`, and `Esc` only to close the search in the main window). Without `--human` it is treated as an AI and refused when the room's AI-reading switch is off. It has never opened real KakaoTalk through this command (the room-opening part itself was checked for real). The consent screen is connected in step 12, so there is no consent check yet. | 7 |
+| `kakao open --room <room> [--human]` | ✅ Command connected (checked once for real) | Opens a room that is word for word on the allowed list, checks that the window title is exactly the room name, and closes the window if the kit opened it (a window that was already open is left alone). It writes and sends nothing and moves only within the allowed keys (`Ctrl+F`, `Ctrl+V`, `Enter`, and `Esc` only to close the search in the main window). Without `--human` it is treated as an AI and refused when the room's AI-reading switch is off. Through this command it passed once in real KakaoTalk on 2026-11-15 (one test room, open → check title → close, exit code 0, the window list was the same as at the start afterwards). It was one run only, so repeat stability, 150% scaling, other tabs and ordinary rooms are unconfirmed. The consent screen is connected in step 12, so there is no consent check yet. | 7 |
 | `kakao help` | ⏳ Planned | Shows Korean help with examples. | 11 |
 | `kakao status` | ✅ Available (minimal) | Only reads and shows the kit version, the KakaoTalk version and whether it is running, the sending mode (full / read-only), the number of allowed rooms and of rooms with AI permission, and whether sending is locked. The login state, monitor scaling and recent errors are added in step 10. | 10 |
 | `kakao rooms (list \| add \| remove \| set)` | ✅ Available | Manages allowed rooms: `rooms list`, `rooms add <room> --type open\|self\|normal [--self-only] --human`, `rooms remove <room> --human`, `rooms set <room> <aiRead\|aiSend\|canSend\|noDraft> <on\|off> --human`. `list` is for anyone; the rest are for a person only (`--human` plus keyboard input). The design's "register only when the search shows exactly one exact-name match" needs KakaoTalk to be operated and does not exist yet (⏳); for now `add` registers by name only, and AI read and send are both off at first. | 11 |
@@ -671,11 +671,20 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 </details>
 
 <details>
+<summary><strong>Round O1: `kakao open` checked once for real (2026-11-15)</strong> — test count unchanged (516)</summary>
+
+- With the person's approval ("O1 60초 시작"), the real `kakao.cmd open --room <test room>` was run once. The settings were created only in a temporary data folder; the real settings were not touched.
+- Result: exit code 0, about 4.9 seconds; it opened the room, confirmed the window title matched, and closed it. Afterwards the KakaoTalk window list was the same as at the start (5 windows) and the screen was still the chat list. Other windows that were already open were left alone.
+- Limits: one run only. Repeat stability, 150% scaling, other tabs and ordinary rooms were not checked. The test room's AI-reading switch was turned on only in the temporary settings for this test.
+
+</details>
+
+<details>
 <summary><strong>Room-opening command `kakao open` connected (2026-11-15)</strong> — tests 499 → 511</summary>
 
 - The room-opening part, already built and checked in real KakaoTalk, is now connected as `kakao open --room <room>`. The allowed list, the caller (person/AI), the run lock and the exact window-title check are applied again in front of the command, and only the window the kit opened is closed. It writes and sends nothing.
 - The tests found one real gap: the router's load list for `open` was missing `Status`, so the error-report path could not have found a function. Unit tests load every part before running, so they cannot catch this kind of omission; a test now starts a new PowerShell with only the router's list and checks that every kit function the loaded files call exists.
-- Limits: the command has never opened real KakaoTalk (only the fake-part tests and the real `kakao.cmd` refusals for a wrong usage and a room not on the list were run). The consent check will be attached to every command together when the first-run screen (step 12) is built.
+- Limits: when it was merged the command had never opened real KakaoTalk (only the fake-part tests and the real `kakao.cmd` refusals for a wrong usage and a room not on the list were run); one real run has been done since (see "Round O1" below). The consent check will be attached to every command together when the first-run screen (step 12) is built.
 
 </details>
 
