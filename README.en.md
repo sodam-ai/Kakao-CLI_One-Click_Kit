@@ -1191,7 +1191,7 @@ There is **no** build step that compiles or bundles. The script files are run as
 - Branches: nothing is pushed straight to the default branch `main`; work goes from a working branch through a pull request (PR).
 - What is not uploaded: session records, checkpoints (`CHECKPOINT.md`), development-tool folders (`.remember`, `.sodam-re`) and secret values (`.env`, key files) are excluded by `.gitignore`.
 - Line-ending rules: `.gitattributes` fixes `.bat` and `.cmd` to CRLF and the other text files to LF. This is so that the tests give the same result whatever the git settings of the receiving PC are.
-- Release: none has been made yet. Whether to make one, with an official version number, is decided after steps 7-13 are done.
+- Release: on 2026-11-15 one **pre-release `v1.0.0`** was made in the private repository (at the user's request). It is a snapshot for my own use, not distribution to others, and real sending and reading are still locked. An official release is decided again after steps 7-13 are done and a lawyer has been consulted.
 
 ### Development rules (enforced by the automated tests)
 
