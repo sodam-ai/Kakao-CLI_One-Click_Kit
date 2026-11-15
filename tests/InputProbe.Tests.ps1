@@ -80,3 +80,68 @@ Describe 'InputProbe: 읽기만 한다는 약속 (소스 검사)' {
         }
     }
 }
+
+# 입력란에 키보드 포커스가 있는지 "읽기만" 한다(UI 자동화의 HasKeyboardFocus 속성). 포커스를 옮기는 SetFocus·클릭·키는 쓰지 않는다.
+Describe 'InputProbe: 입력란 포커스 읽기 (③-a, 읽기만)' {
+    It 'returns false (never throws) for handles that are not a window' {
+        foreach ($h in 0, -5, 999999999) {
+            $r = Get-KakaoInputFocus -Hwnd $h
+            ($r -is [bool]) | Should Be $true
+            $r | Should Be $false
+        }
+    }
+
+    It 'reads only HasKeyboardFocus and never moves focus, clicks or sends keys' {
+        $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\InputProbe.ps1'))
+        $code = (($text -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        $code.Contains('HasKeyboardFocus') | Should Be $true
+        foreach ($bad in 'SetFocus', 'Invoke(', 'SendKeys', 'SendInput', 'mouse_event', 'SetCursorPos', 'SetForegroundWindow') {
+            $code.IndexOf($bad, [System.StringComparison]::OrdinalIgnoreCase) | Should Be -1
+        }
+    }
+}
+
+# 메인 창이 어떤 화면인지 구조 이름으로 읽는다(배율·창 크기와 무관). 2026-11-15 실제 읽은 값: 컨테이너 창 이름이 카카오톡 내부 화면 이름이다.
+#   채팅 탭: ChatRoomListView_0x… 아래 ChatRoomListCtrl_0x… / 검색을 열면 같은 자리가 SearchListCtrl_0x… / 친구 탭: ContactListView_0x…
+Describe 'InputProbe: 메인 창 화면 판정 (읽기만, 이름 뒤의 번호는 무시)' {
+    It 'recognizes the chat list screen, with or without a different hex number after the name' {
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x00010500', 'ChatRoomListView_0x00010514', 'ChatRoomListCtrl_0x00010516') | Should Be 'chat-list'
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x1', 'ChatRoomListView_0xABCDEF', 'ChatRoomListCtrl_0x2') | Should Be 'chat-list'
+    }
+
+    It 'recognizes the open search on the chat tab' {
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x00010500', 'ChatRoomListView_0x00010514', 'SearchListCtrl_0x0001051c') | Should Be 'chat-search'
+    }
+
+    It 'calls every other screen "other" (the friends tab is not a chat screen)' {
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x00010500', 'ContactListView_0x00010502', 'ContactListCtrl_0x0001050a') | Should Be 'other'
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x1', 'SomethingElse_0x2') | Should Be 'other'
+    }
+
+    It 'says unknown (never a guess) for nothing, odd input, a list without the main-window root name, a chat view with no list, or a list that is both the chat list and the search' {
+        foreach ($bad in $null, @(), @($null), @(5, 'x'), @('ChatRoomListView_0x1', 'ChatRoomListCtrl_0x2'), @('OnlineMainView_0x0', 'ChatRoomListView_0x1')) {
+            ConvertTo-MainScreenState -Names $bad | Should Be 'unknown'
+        }
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x0', 'ChatRoomListView_0x1', 'ChatRoomListCtrl_0x2', 'SearchListCtrl_0x3') | Should Be 'unknown'
+    }
+
+    It 'needs the name to start exactly like the known prefix (a look-alike in the middle or with another case does not count)' {
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x0', 'XChatRoomListView_0x1', 'XChatRoomListCtrl_0x2') | Should Be 'other'
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x0', 'chatroomlistview_0x1', 'chatroomlistctrl_0x2') | Should Be 'other'
+        ConvertTo-MainScreenState -Names @('OnlineMainView_0x0', 'ChatRoomListView', 'ChatRoomListCtrl') | Should Be 'other'
+    }
+
+    It 'never throws and answers unknown for handles that are not a window' {
+        foreach ($h in 0, -5, 999999999) { Get-KakaoMainScreen -Hwnd $h | Should Be 'unknown' }
+    }
+
+    It 'is read-only: only reads properties, no key, click, focus move or value write, and logs nothing' {
+        $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\InputProbe.ps1'))
+        $start = $text.IndexOf('function Get-KakaoMainScreen')
+        $start | Should BeGreaterThan -1
+        $code = (($text.Substring($start) -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        foreach ($bad in 'SetFocus', 'Invoke(', 'SendKeys', 'SendInput', 'Send-KeyCombo', 'mouse_event', 'SetForegroundWindow', 'Write-Host', 'Write-KitLog', 'Out-File', 'SetValue') {
+            $code.IndexOf($bad, [System.StringComparison]::OrdinalIgnoreCase) | Should Be -1
+        }
+    }
+}

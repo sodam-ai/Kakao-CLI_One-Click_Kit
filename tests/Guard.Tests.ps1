@@ -332,14 +332,23 @@ Describe 'Guard: 사용자 간섭' {
 }
 
 Describe 'Guard: 소스에 위험한 키 코드가 없다' {
-    It 'src has no Esc key code, SendKeys or raw key messages' {
-        $patterns = '(?i)\b0x0*1B\b', 'VK_ESCAPE', 'SendKeys', 'WM_KEYDOWN', '\{ESC\}', 'keybd_event'
+    It 'src has no SendKeys, raw key messages or Esc other than the one title-restricted entry (Win32.ps1 and Guard.ps1 only)' {
+        $patterns = 'VK_ESCAPE', 'SendKeys', 'WM_KEYDOWN', '\{ESC\}', 'keybd_event'
         $hits = @()
         foreach ($f in (Get-ChildItem -Path (Join-Path $kitRoot 'src') -Recurse -File -Include *.ps1)) {
             $text = [System.IO.File]::ReadAllText($f.FullName)
             foreach ($pat in $patterns) { if ($text -match $pat) { $hits += ($f.Name + ':' + $pat) } }
         }
         ($hits -join ', ') | Should BeNullOrEmpty
+        # Esc(0x1B)는 메인 창 제목일 때만 허용한다(2026-11-15 사용자 승인: 검색을 닫는 용도). 코드에 나오는 곳은 이 두 파일의 정해진 자리뿐이다.
+        $esc = @{}
+        foreach ($f in (Get-ChildItem -Path (Join-Path $kitRoot 'src') -Recurse -File -Include *.ps1)) {
+            $n = [regex]::Matches([System.IO.File]::ReadAllText($f.FullName), '(?i)\b0x0*1B\b').Count
+            if ($n -gt 0) { $esc[$f.Name] = $n }
+        }
+        (@($esc.Keys | Sort-Object) -join ',') | Should Be 'Guard.ps1,Win32.ps1'
+        $esc['Guard.ps1'] | Should Be 1
+        $esc['Win32.ps1'] | Should Be 2
     }
 
     It 'only Win32.ps1 talks to the native input class' {
@@ -549,6 +558,105 @@ Describe 'Guard: 창 올리기 재시도 (2번 시험 앞 3회 "맨 앞에 없�
             if ($case -eq 'Title') { $f.Title = '다른방' } else { $f.Process = 'notepad' }
             (Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
             (Get-InputCalls $f).Count | Should Be 0
+        }
+    }
+}
+Describe 'Guard: Set-KakaoWindowFront (③, 키·클릭 없이 창만 앞으로)' {
+    It 'raises the window and reports true, sending no key, click or close' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 1
+        (Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider) | Should Be $true
+        $f.SetCount | Should Be 1
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'retries up to 3 times and reports false (not an error) when it never reaches the front' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 4
+        (Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider) | Should Be $false
+        $f.SetCount | Should Be 3
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'does not raise at all when the process or the title is wrong (exit 2)' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Process = 'notepad'
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 0
+        $f2 = New-FakeProvider
+        Initialize-Guard $f2
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '다른방' -Provider $f2.Provider }).ExitCode | Should Be 2
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '' -Provider $f2.Provider }).ExitCode | Should Be 2
+        $f2.SetCount | Should Be 0
+    }
+
+    It 'stops without taking the window back again when the person touched the keyboard or mouse' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 3
+        $f.TickOnSet = 2222
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 1
+    }
+
+    It 'refuses to run without the human-hand baseline' {
+        $f = New-FakeProvider
+        Reset-InputBaseline
+        (Get-ThrownError { Set-KakaoWindowFront -Hwnd 100 -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+        $f.SetCount | Should Be 0
+    }
+}
+
+# Esc 는 메인 창 제목("카카오톡")일 때만 보낼 수 있다(2026-11-15 사용자 승인). 방 창에서는 창을 닫기 때문에 절대 가면 안 된다. PowerShell 쪽과 C# 쪽 양쪽에서 막는다.
+Describe 'Guard: Esc 는 메인 창 제목일 때만 (검색을 닫는 용도)' {
+    It 'sends Esc to the main window (title exactly 카카오톡) like any allowed key' {
+        $f = New-FakeProvider
+        $f.Title = '카카오톡'
+        Initialize-Guard $f
+        Send-KeyCombo -Hwnd 100 -Keys 'Esc' -ExpectedTitle '카카오톡' -Provider $f.Provider
+        ((Get-InputCalls $f) -join '|') | Should Be 'Combo:100:1B'
+    }
+
+    It 'refuses Esc for any other title (a room window!) before touching the window at all (exit 2)' {
+        foreach ($title in '비밀방', '카카오톡 ', '카카오톡방', '카카오', '', '카카오톡톡', ('카카오톡' + [char]0x200B)) {
+            $f = New-FakeProvider
+            $f.Title = $title
+            Initialize-Guard $f
+            $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Esc' -ExpectedTitle $title -Provider $f.Provider }
+            $e.ExitCode | Should Be 2
+            $f.SetCount | Should Be 0
+            (Get-InputCalls $f).Count | Should Be 0
+        }
+    }
+
+    It 'matches the key name exactly: only the name Esc is allowed (not Escape, ESC, esc, Esc+Esc)' {
+        foreach ($name in 'Escape', 'ESC', 'esc', 'Esc+Esc', ' Esc', 'Esc ') {
+            $f = New-FakeProvider
+            $f.Title = '카카오톡'
+            Initialize-Guard $f
+            (Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys $name -ExpectedTitle '카카오톡' -Provider $f.Provider }).ExitCode | Should Be 2
+            (Get-InputCalls $f).Count | Should Be 0
+        }
+    }
+
+    It 'the native sender also refuses Esc for any title but the main window, before any check or input (status 6)' {
+        [KakaoWin32]::SendCombo(0, '비밀방', [byte[]]@(0x1B), 0) | Should Be 6
+        [KakaoWin32]::SendCombo(0, '', [byte[]]@(0x1B), 0) | Should Be 6
+        [KakaoWin32]::SendCombo(0, '카카오톡 ', [byte[]]@(0x1B), 0) | Should Be 6
+        [KakaoWin32]::SendCombo(0, $null, [byte[]]@(0x1B), 0) | Should Be 6
+        # 제목이 메인 창이어도 창이 카카오톡이 아니면(번호 0) 입력 전에 멈춘다: 6 이 아니라 1(프로세스 불일치).
+        [KakaoWin32]::SendCombo(0, '카카오톡', [byte[]]@(0x1B), 0) | Should Be 1
+    }
+
+    It 'the native sender still refuses every key that is not on the table (digits, Delete, Backspace, Ctrl+A)' {
+        foreach ($combo in @(@(0x11, 0x41), @(0x2E), @(0x08), @(0x11, 0x31), @(0x1B, 0x1B), @(0x11, 0x1B))) {
+            [KakaoWin32]::SendCombo(0, '카카오톡', [byte[]]$combo, 0) | Should Be 6
         }
     }
 }

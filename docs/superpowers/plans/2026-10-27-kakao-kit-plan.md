@@ -12,6 +12,8 @@
 
 **동기화 안내 (2026-11-13):** 이 계획서는 작성 당시(2026-10-27) 기준이다. 실제 코드와 다른 곳은 코드가 정본이다. 이번에 고친 것: 허용 키는 **다섯 개(Ctrl+S, Ctrl+V, Ctrl+C, Ctrl+F, Enter)이고 Ctrl+A 는 없다**(친구 추가 창을 연다) · 방 열기는 돋보기 클릭이 아니라 **Ctrl+F** · 포커스는 키트가 만드는 것이 아니라 **사람이 카카오톡을 클릭하고 키트는 기다림**(설계서 13.8) · 보내기는 **키트가 직접 연 창에만**(입력란 초안 확인용 Ctrl+A 는 쓰지 않음, 설계서 13.2) · 저장 창에서 Ctrl+A 는 쓰지 않음(설계서 13.9). 그 밖의 차이는 CHECKPOINT 2.3·`tasks/progress.md` 의 `Ruling:` 을 본다.
 
+**동기화 안내 (2026-11-15):** 허용 키는 위 다섯 개에 더해 **Esc 를 메인 창(제목 `카카오톡`)에서 검색이 열려 있을 때만** 허용한다(Guard·Win32 양쪽에서 제목 일치를 강제, 사용자 승인). Task 7 의 방 열기는 OCR·비례 좌표 클릭이 아니라 **UI Automation 구조 판독 + Ctrl+F·붙여넣기·Enter** 이고, 열기가 끝나면 검색을 Esc 로 닫는다. Task 8 의 `Ready` 는 `Get-SendUnmetReadyConditions` 가 비어야 열리며 VerifySent(`Verify.ps1`, 아직 Send 에 연결 안 됨)와 사람 승인 전까지 잠겨 있다. Task 10~12 중 `open`·`export`·`help`·`update`·`uninstall`·`menu` 명령과 `Install.ps1`·`Menu.ps1` 은 아직 없다.
+
 **Repo note:** (작성 당시 기록. 지금은 git 저장소이며 작업 브랜치와 커밋 규칙은 CHECKPOINT 3.C 를 따른다.) 프로젝트 폴더는 git 저장소가 아니므로 commit 단계는 없다. 각 작업이 끝나면 `tasks/todo.md`에 체크하고 `tools/Test-All.ps1` 통과를 기록한다.
 
 ## Global Constraints

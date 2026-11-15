@@ -49,7 +49,7 @@ public static class KakaoWin32 {
     // 입력 결과 코드: 0 성공, 1 카카오톡 창 아님, 2 제목 다름, 3 맨 앞 아님, 4 사람 손 감지(또는 기준 없음), 5 다른 키 눌림,
     // 6 허용되지 않은 키 조합, 7 클릭 자리가 다른 창에 가림, 8 마우스 위치가 바뀜, 9 입력 전달 실패, 10 잘못된 인자
     static readonly byte[][] AllowedCombos = new byte[][] {
-        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x11, 0x46 }, new byte[] { 0x0D }
+        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x11, 0x46 }, new byte[] { 0x0D }, new byte[] { 0x1B }
     };
 
     public static long[] TopLevelWindows() {
@@ -201,6 +201,8 @@ public static class KakaoWin32 {
     // 확인과 키 입력을 한 번에. 눌렀다 떼는 전체를 SendInput 배열 하나로 보내므로 다른 입력이 끼어들 수 없고 Ctrl이 눌린 채 남지 않는다.
     public static int SendCombo(long hwnd, string expectedTitle, byte[] vks, long baselineTick) {
         if (!ComboAllowed(vks)) return 6;
+        // Esc 는 방 창을 닫으므로 메인 창(제목이 정확히 "카카오톡")에만 보낼 수 있다(2026-11-15 사용자 승인, 검색을 닫는 용도). 다른 제목이면 어떤 확인보다 먼저 거절한다.
+        if (vks.Length == 1 && vks[0] == 0x1B && !string.Equals(expectedTitle, "카카오톡", StringComparison.Ordinal)) return 6;
         int status = CheckTarget(hwnd, expectedTitle, baselineTick);
         if (status != 0) return status;
         List<INPUT> list = new List<INPUT>();
