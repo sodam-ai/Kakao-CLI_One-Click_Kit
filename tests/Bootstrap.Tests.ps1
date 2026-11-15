@@ -232,12 +232,40 @@ Describe 'Bootstrap: kakao.cmd' {
         $r.Out | Should Match '[가-힣]'
     }
 
-    # 'help' 명령이 생기면(11단계) 이 시험과 두 문구를 함께 고친다. 지금은 없는 명령을 안내하면 안내가 제자리를 돈다.
-    It 'does not point to a help command that does not exist: no-command, unknown and "help" all name only commands that work' {
-        foreach ($r in (Invoke-Cli @()), (Invoke-Cli @('nosuchcommand')), (Invoke-Cli @('help'))) {
+    # help 명령이 생겼으므로 "명령 없음"·"모르는 명령" 안내는 kakao help 를 가리킨다(예전에는 없는 명령을 가리키면 안내가 제자리를 돌아서 막아 두었다).
+    It 'no-command and unknown-command hints point to "kakao help" and still name the commands that work' {
+        foreach ($r in (Invoke-Cli @()), (Invoke-Cli @('nosuchcommand'))) {
             $r.ExitCode | Should Be 1
-            $r.Out | Should Not Match 'kakao help'
+            $r.Out | Should Match 'kakao help'
             $r.Out | Should Match 'version'
+        }
+    }
+
+    It 'help prints the usage, exits 0, and marks the commands that do not exist yet as "in preparation"' {
+        $r = Invoke-Cli @('help')
+        $r.ExitCode | Should Be 0
+        $r.Out | Should Match '카카오톡 키트 사용법'
+        foreach ($c in 'open', 'export', 'update', 'uninstall', 'menu') {
+            # 아직 없는 명령은 "준비 중" 줄에만 있어야 하고, 쓸 수 있는 명령 줄로 나오면 안 된다.
+            $r.Out | Should Match ('준비 중인 기능.*' + $c)
+            @($r.Out -split "`r?`n" | Where-Object { $_ -match ('^\s+' + $c + '\s') }).Count | Should Be 0
+        }
+    }
+
+    It 'help lists exactly the commands the router really handles (it cannot drift from the router)' {
+        $router = [System.IO.File]::ReadAllText((Join-Path $root 'src\kakao.ps1'), (New-Object System.Text.UTF8Encoding($false)))
+        $real = @([regex]::Matches($router, "(?m)^\s+'(\w+)'\s*\{") | ForEach-Object { $_.Groups[1].Value } | Sort-Object)
+        $r = Invoke-Cli @('help')
+        $listed = @(($r.Out -split "`r?`n") | ForEach-Object { if ($_ -match '^\s{2}(\w+)\s{2,}\S') { $Matches[1] } } | Sort-Object)
+        ($listed -join ',') | Should Be ($real -join ',')
+    }
+
+    It 'help takes no extra words: anything after it is a usage error (exit 1) and no usage text is printed' {
+        foreach ($extra in 'status', '--json', 'help') {
+            $r = Invoke-Cli @('help', $extra)
+            $r.ExitCode | Should Be 1
+            $r.Out | Should Match 'kakao help'
+            $r.Out | Should Not Match '카카오톡 키트 사용법'
         }
     }
 }

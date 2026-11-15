@@ -18,6 +18,17 @@ function Invoke-KakaoCommand {
             Write-Host (Get-Msg -Key 'version.banner' -FormatArgs @(Get-KitVersion))
             return 0
         }
+        'help' {
+            # 문구만 보여 준다(카카오톡·설정 파일·기록을 건드리지 않는다). 뒤에 글자가 있으면 사용법 오류다.
+            if ($Argv.Count -gt 1) {
+                Write-Host (Get-Msg -Key 'help.extraArgs')
+                return 1
+            }
+            foreach ($key in 'help.title', 'help.version', 'help.status', 'help.rooms', 'help.read', 'help.search', 'help.send', 'help.help', 'help.soon') {
+                Write-Host (Get-Msg -Key $key)
+            }
+            return 0
+        }
         'send' {
             # 보내기에 필요한 부품은 이 명령일 때만 불러온다(version 등 다른 명령은 카카오톡 관련 부품을 건드리지 않는다).
             foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'InputProbe', 'Foreground', 'Send', 'SendCommand') {

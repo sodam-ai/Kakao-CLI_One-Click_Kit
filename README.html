@@ -56,7 +56,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <div class="table-wrap"><table>
 <thead><tr><th>궁금한 것</th><th>답</th></tr></thead>
 <tbody>
-<tr><td>지금 쓸 수 있는 명령</td><td><code>kakao version</code> 하나뿐입니다. (<code>kakao status</code>·<code>rooms</code>·<code>read</code>·<code>search</code> 는 카카오톡을 조작하지 않는 명령줄만 연결됐고, <code>read</code>·<code>search</code> 는 내보내기 파일이 생기는 <code>export</code> 가 만들어져야 자료가 있습니다. <code>kakao send</code> 는 보내기가 잠겨 있어 아무것도 보내지 않습니다.)</td></tr>
+<tr><td>지금 쓸 수 있는 명령</td><td><code>kakao version</code> 과 <code>kakao help</code>(사용법 보기)입니다. (<code>kakao status</code>·<code>rooms</code>·<code>read</code>·<code>search</code> 는 카카오톡을 조작하지 않는 명령줄만 연결됐고, <code>read</code>·<code>search</code> 는 내보내기 파일이 생기는 <code>export</code> 가 만들어져야 자료가 있습니다. <code>kakao send</code> 는 보내기가 잠겨 있어 아무것도 보내지 않습니다.)</td></tr>
 <tr><td>메시지 보내기, 대화 읽기</td><td>아직 안 됩니다. 읽기를 먼저, 보내기를 그다음에 만듭니다(2장).</td></tr>
 <tr><td>설치와 준비</td><td>폴더를 복사하면 끝입니다. 설치 프로그램, 회원가입, 관리자 권한, 인터넷이 모두 필요 없습니다(3~4장).</td></tr>
 <tr><td>누가 쓰나요</td><td>소유자가 정한 대로 <strong>개인용으로만</strong> 씁니다. 본인 계정, 본인 컴퓨터, 본인 혼자 있는 방에서만 시험하고, 공개·배포·판매는 하지 않습니다(17장).</td></tr>
@@ -340,9 +340,23 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>임시 안내 화면 보기: <code>시작.bat</code> 을 더블클릭합니다.
 </li>
-<li>명령 없이 <code>.\kakao.cmd</code> 만 입력하면 <code>명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기), status (점검), rooms (허용 방 관리), read (대화 읽기), search (대화 찾기), send (보내기, 지금은 잠겨 있음)</code> 가 나옵니다(종료 코드 1).
+<li>명령 없이 <code>.\kakao.cmd</code> 만 입력하면 <code>명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기), status (점검), rooms (허용 방 관리), read (대화 읽기), search (대화 찾기), send (보내기, 지금은 잠겨 있음), help (도움말). 자세한 설명은 kakao help</code> 가 나옵니다(종료 코드 1).
 </li>
-<li>모르는 명령을 입력하면 <code>알 수 없는 명령입니다: &lt;입력한 글자&gt;  (지금 쓸 수 있는 명령: version, status, rooms, read, search, send)</code> 가 나옵니다(종료 코드 1).
+<li>모르는 명령을 입력하면 <code>알 수 없는 명령입니다: &lt;입력한 글자&gt;  (지금 쓸 수 있는 명령: version, status, rooms, read, search, send, help. 자세한 설명은 kakao help)</code> 가 나옵니다(종료 코드 1).
+</li>
+<li><code>.\kakao.cmd help</code> 를 입력하면 아래가 나옵니다(종료 코드 0). 카카오톡·설정 파일·기록을 건드리지 않고 글만 보여 줍니다. 아직 없는 명령은 맨 아래 "준비 중인 기능" 줄에만 나오며, 이 줄은 코드의 명령 목록과 어긋나지 않는지 시험이 확인합니다.
+</li></ul>
+<pre><code class="language-text">카카오톡 키트 사용법: kakao &lt;명령&gt; [옵션]  (PowerShell 에서는 .\kakao.cmd &lt;명령&gt;)
+  version   키트 버전을 보여 줍니다.
+  status    키트와 카카오톡의 상태를 읽기만 해서 보여 줍니다.
+  rooms     허용한 방을 보고 관리합니다. (추가·삭제·권한 변경은 사람만 할 수 있습니다)
+  read      보관된 대화 파일을 읽습니다. (카카오톡을 조작하지 않습니다)
+  search    보관된 대화 파일에서 낱말을 찾습니다. (카카오톡을 조작하지 않습니다)
+  send      메시지 보내기입니다. 지금은 안전을 위해 잠겨 있어 아무것도 보내지 않습니다.
+  help      이 설명을 보여 줍니다.
+준비 중인 기능(아직 쓸 수 없음): open (방 열기), export (대화 저장), update (업데이트), uninstall (제거), menu (메뉴)</code></pre>
+<ul>
+<li><code>help</code> 뒤에 다른 글자를 붙이면 <code>help 는 뒤에 글자를 받지 않습니다. kakao help 만 입력하세요.</code> 가 나옵니다(종료 코드 1).
 </li>
 <li><code>.\kakao.cmd status</code> 는 키트 버전, 카카오톡 버전·실행 여부, 보내기 모드, 허용된 방 수를 읽기만 해서 보여 줍니다(종료 코드 0). 로그인 상태·모니터 배율·최근 오류는 ⏳ 10단계입니다.
 </li>
@@ -387,6 +401,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <thead><tr><th>명령</th><th>상태</th><th>하는 일</th><th>단계</th></tr></thead>
 <tbody>
 <tr><td><code>kakao version</code></td><td>✅ 사용 가능</td><td>키트 버전을 보여 줍니다. 출력: <code>카카오톡 키트 1.0.0</code></td><td>1</td></tr>
+<tr><td><code>kakao help</code></td><td>✅ 사용 가능</td><td>쓸 수 있는 명령과 아직 없는 기능(준비 중)을 구분해 보여 줍니다. 카카오톡·설정·기록을 건드리지 않습니다. 뒤에 글자를 붙이면 종료 코드 1입니다.</td><td>11</td></tr>
 <tr><td><code>kakao help</code></td><td>⏳ 예정</td><td>한글 도움말과 예시를 보여 줍니다.</td><td>11</td></tr>
 <tr><td><code>kakao status</code></td><td>✅ 사용 가능 (최소판)</td><td>키트 버전, 카카오톡 버전·실행 여부, 보내기 모드(전체/읽기 전용), 허용 방 수와 AI 권한 방 수, 보내기 잠김 여부를 읽기만 해서 보여 줍니다. 로그인 상태·모니터 배율·최근 오류는 10단계에서 덧붙입니다.</td><td>10</td></tr>
 <tr><td><code>kakao rooms (list | add | remove | set)</code></td><td>✅ 사용 가능</td><td>허용 방 관리: <code>rooms list</code>, <code>rooms add &lt;방&gt; --type open|self|normal [--self-only] --human</code>, <code>rooms remove &lt;방&gt; --human</code>, <code>rooms set &lt;방&gt; &lt;aiRead|aiSend|canSend|noDraft&gt; &lt;on|off&gt; --human</code>. <code>list</code> 는 누구나, 나머지는 사람만(<code>--human</code> + 키보드 입력). 설계서의 "검색에서 이름이 정확히 일치하는 1건일 때만 등록"은 카카오톡 조작이 필요해서 아직 없고(⏳), 지금은 <code>add</code> 가 이름만 보고 등록하며 처음에는 AI 읽기·보내기가 모두 꺼져 있습니다.</td><td>11</td></tr>
@@ -703,6 +718,18 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <a id="changelog"></a>
 <h2>14. 업데이트 내용 요약 (펼쳐 보기)</h2>
 <p>제목을 누르면 내용이 펼쳐집니다. 작업은 2026-10-27부터 2026-10-31까지 이루어졌습니다. 시험 개수는 그 시점에 통과한 자동 시험의 수입니다.</p>
+<details>
+<summary><strong>도움말 명령 `kakao help` 추가 (2026-11-15)</strong> — 시험 496개 → 499개</summary>
+<ul>
+<li>사용자가 쓸 수 있는 명령이 무엇인지 알려 주는 곳이 없던 문제를 고쳤습니다. <code>help</code> 는 연결된 명령만 "쓸 수 있는 명령"으로 보여 주고, 아직 없는 기능(open·export·update·uninstall·menu)은 "준비 중" 줄에만 적습니다. 없는 기능을 있다고 안내하지 않습니다.
+</li>
+<li>"명령 없음"·"모르는 명령" 안내가 <code>kakao help</code> 를 가리키도록 고쳤습니다(예전에는 없는 명령을 가리키면 안내가 제자리를 돌아서 막아 두었던 시험을 이번에 함께 바꿨습니다).
+</li>
+<li>도움말 목록이 코드의 실제 명령 목록과 어긋나지 않는지 확인하는 시험을 넣었습니다. 카카오톡을 조작하지 않으며 키·클릭을 보내지 않습니다.
+</li>
+<li>한계: 사람이 쓰는 <code>--help</code>·<code>-h</code>·<code>/?</code> 형태는 아직 모르는 명령으로 처리됩니다(안내 문구가 <code>kakao help</code> 를 가리킵니다).
+</li></ul>
+</details>
 <details>
 <summary><strong>방 열기를 구조 기반으로 바꾸고 검색을 닫는 Esc 를 제한적으로 허용 (2026-11-15)</strong> — 시험 481개 → 496개</summary>
 <ul>
@@ -1214,7 +1241,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <div class="table-wrap"><table>
 <thead><tr><th>시험 파일</th><th>개수</th><th>검사하는 것</th></tr></thead>
 <tbody>
-<tr><td><code>Bootstrap.Tests.ps1</code></td><td>24</td><td>한글 깨짐 방지 규칙(BOM·줄 끝), 관리자 권한 요청과 Program Files·HKLM 쓰기가 없음, 한글 문구와 데이터 폴더 위치, 오류 설정 고정 규칙, <code>시작.bat</code> 이 폴더 이름의 특수 글자에서도 동작함, <code>.gitignore</code> 항목, <code>version</code> 과 모르는 명령의 동작, 없는 <code>help</code> 를 안내하지 않음, 없는 드라이브의 데이터 폴더 계산, 특수문자 인자가 실행되는 경로와 안 되는 경로</td></tr>
+<tr><td><code>Bootstrap.Tests.ps1</code></td><td>27</td><td>한글 깨짐 방지 규칙(BOM·줄 끝), 관리자 권한 요청과 Program Files·HKLM 쓰기가 없음, 한글 문구와 데이터 폴더 위치, 오류 설정 고정 규칙, <code>시작.bat</code> 이 폴더 이름의 특수 글자에서도 동작함, <code>.gitignore</code> 항목, <code>version</code>·<code>help</code> 와 모르는 명령의 동작, <code>help</code> 목록이 실제 명령과 어긋나지 않음, 없는 드라이브의 데이터 폴더 계산, 특수문자 인자가 실행되는 경로와 안 되는 경로</td></tr>
 <tr><td><code>Config.Tests.ps1</code></td><td>34</td><td>허용 목록, 권한, 사람만 변경, 동의, 손으로 고친 이상한 설정, 방별 <code>noDraft</code>(초안 없음) 표시</td></tr>
 <tr><td><code>Log.Tests.ps1</code></td><td>11</td><td>본문 없는 기록, 기록 파일 정리, 오류 보고서</td></tr>
 <tr><td><code>Guard.Tests.ps1</code></td><td>59</td><td>문지기: 창 확인, 허용 키, 눌린 키 검사(한/영 키만 예외), 사람 손 감지, 동시 실행 잠금, 클릭 안전, 소스에 Esc 등 위험한 키 코드가 없음, 실제 윈도우 기능 읽기(입력은 보내지 않음), 대상 창을 앞으로 올리는 재시도 최대 3번(사람이 손대면 멈춤), 키·클릭 없이 창만 앞으로 올리기(프로세스·제목 확인, 3번 시도, 사람 손 감지), <code>Esc</code> 는 메인 창 제목일 때만 보낼 수 있음(PowerShell과 C# 양쪽, 방 창에는 가지 않음, 다른 키는 그대로 거절)</td></tr>
@@ -1231,7 +1258,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Foreground.Tests.ps1</code></td><td>9</td><td>맨 앞 창 대기(가짜 시계·가짜 창): 이미 맨 앞이면 안내 없이 2초 뒤 진행, 기다릴 때 안내가 한 번만 나옴, 잠깐 벗어나면 2초를 다시 셈, 120초 안에 안 되면 입력 없이 멈춤(종료 코드 2), 정확히 120초에 안정되면 성공·그보다 늦으면 실패(경계), 확인이 실패하면 원래 오류로 멈춤, 창 번호나 필수 항목이 없으면 거절, 소스에 키·클릭·포커스 변경이 없음, 실제 제공자는 읽기만 함</td></tr>
 <tr><td><code>InfoCommands.Tests.ps1</code></td><td>26</td><td><code>rooms</code>·<code>read</code>·<code>search</code>·<code>status</code> 명령 계층(임시 폴더·합성 자료·가짜 설치 정보만 씀): <code>rooms list</code>(비었을 때, 참이 아닌 값은 아니오), 허용 목록 변경이 <code>--human</code> 없이·입력이 막힌 채로는 거절되고 아무것도 바꾸지 않음, <code>add</code>(AI 권한 꺼짐·안내·중복 거절·종류/이름/인자 수 오류), <code>remove</code>, <code>set</code>(on/off 소문자만), 하위 명령 오류, <code>read</code>(사람/AI 권한, <code>--since</code> 고정 시계, 옵션 오류 13가지, 내보내기 없음 종료 코드 3, 제어 문자 제거, 기록에 본문 없음), <code>search</code>(글자 그대로, AI 권한 범위, 낱말 길이·옵션 오류, 기록에 낱말 없음), <code>status</code>(전체/읽기 전용 모드·미설치·보내기 잠김·인자 거절·설정 파일을 만들지 않음), 새 프로세스로 <code>kakao.cmd</code> 실행</td></tr>
 <tr><td><code>Verify.Tests.ps1</code></td><td>9</td><td>보낸 글 확인의 판정(순수 함수, 카카오톡·클립보드·키·파일을 건드리지 않음): 보낸 분 이후에 같은 글이 있을 때만 확인됨, 예전 글·다른 글(길이·대소문자·기호·이모지 차이)은 모름, 줄바꿈 방식과 줄 끝 공백만 무시, 보낸 사람을 구분할 수 없는 방은 항상 모름, 일치 개수를 함께 돌려줌(중복 전송 의심), 시각을 모르는 메시지와 이상한 입력은 던지지 않고 모름</td></tr>
-<tr><td><strong>합계</strong></td><td><strong>496</strong></td><td></td></tr>
+<tr><td><strong>합계</strong></td><td><strong>499</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>설명서 html 만들기</h3>
 <p>설명서의 원본은 <code>README.md</code> 와 <code>README.en.md</code> 입니다. html은 아래 도구로 만들며, 손으로 고치지 않습니다.</p>

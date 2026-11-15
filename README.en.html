@@ -56,7 +56,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <div class="table-wrap"><table>
 <thead><tr><th>What you may wonder</th><th>Answer</th></tr></thead>
 <tbody>
-<tr><td>Commands you can use now</td><td>Only <code>kakao version</code>. (<code>kakao status</code>, <code>rooms</code>, <code>read</code> and <code>search</code> have only a command line connected that does not operate KakaoTalk, and <code>read</code> and <code>search</code> have data only after <code>export</code> is built. <code>kakao send</code> has sending locked and sends nothing.)</td></tr>
+<tr><td>Commands you can use now</td><td><code>kakao version</code> and <code>kakao help</code> (shows the usage). (<code>kakao status</code>, <code>rooms</code>, <code>read</code> and <code>search</code> have only a command line connected that does not operate KakaoTalk, and <code>read</code> and <code>search</code> have data only after <code>export</code> is built. <code>kakao send</code> has sending locked and sends nothing.)</td></tr>
 <tr><td>Sending messages, reading chats</td><td>Not yet. Reading is built first, sending after it (Chapter 2).</td></tr>
 <tr><td>Setup and preparation</td><td>Copy the folder and you are done. No installer, no sign-up, no administrator rights and no internet are needed (Chapters 3-4).</td></tr>
 <tr><td>Who uses it</td><td>As the owner decided, it is used <strong>for personal use only</strong>. It is tested only with your own account, on your own computer, in a room where you are alone, and it is not published, distributed or sold (Chapter 17).</td></tr>
@@ -340,9 +340,24 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li>See the temporary guide screen: double-click <code>시작.bat</code>.
 </li>
-<li>Typing only <code>.\kakao.cmd</code> with no command prints <code>명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기), status (점검), rooms (허용 방 관리), read (대화 읽기), search (대화 찾기), send (보내기, 지금은 잠겨 있음)</code> ("There is no command. Commands you can use now: version (show the version), status (check), rooms (manage allowed rooms), read (read a chat), search (search a chat), send (send; locked for now).") (exit code 1).
+<li>Typing only <code>.\kakao.cmd</code> with no command prints <code>명령이 없습니다. 지금 쓸 수 있는 명령: version (버전 보기), status (점검), rooms (허용 방 관리), read (대화 읽기), search (대화 찾기), send (보내기, 지금은 잠겨 있음), help (도움말). 자세한 설명은 kakao help</code> ("There is no command. Commands you can use now: version (show the version), status (check), rooms (manage allowed rooms), read (read a chat), search (search a chat), send (send; locked for now), help. For details: kakao help.") (exit code 1).
 </li>
-<li>Typing an unknown command prints <code>알 수 없는 명령입니다: &lt;what you typed&gt;  (지금 쓸 수 있는 명령: version, status, rooms, read, search, send)</code> ("Unknown command: ... (commands you can use now: version, status, rooms, read, search, send)") (exit code 1).
+<li>Typing an unknown command prints <code>알 수 없는 명령입니다: &lt;what you typed&gt;  (지금 쓸 수 있는 명령: version, status, rooms, read, search, send, help. 자세한 설명은 kakao help)</code> ("Unknown command: ... (commands you can use now: version, status, rooms, read, search, send, help. For details: kakao help)") (exit code 1).
+</li>
+<li>Typing <code>.\kakao.cmd help</code> prints the text below (exit code 0). It only shows text and does not touch KakaoTalk, the settings file or the records. A command that does not exist yet appears only on the last "in preparation" line, and a test checks that this list never drifts from the commands in the code.
+</li></ul>
+<pre><code class="language-text">카카오톡 키트 사용법: kakao &lt;명령&gt; [옵션]  (PowerShell 에서는 .\kakao.cmd &lt;명령&gt;)
+  version   키트 버전을 보여 줍니다.
+  status    키트와 카카오톡의 상태를 읽기만 해서 보여 줍니다.
+  rooms     허용한 방을 보고 관리합니다. (추가·삭제·권한 변경은 사람만 할 수 있습니다)
+  read      보관된 대화 파일을 읽습니다. (카카오톡을 조작하지 않습니다)
+  search    보관된 대화 파일에서 낱말을 찾습니다. (카카오톡을 조작하지 않습니다)
+  send      메시지 보내기입니다. 지금은 안전을 위해 잠겨 있어 아무것도 보내지 않습니다.
+  help      이 설명을 보여 줍니다.
+준비 중인 기능(아직 쓸 수 없음): open (방 열기), export (대화 저장), update (업데이트), uninstall (제거), menu (메뉴)</code></pre>
+<p>(In English: the title is "Kakao Kit usage: kakao &lt;command&gt; [options]"; each line explains a command; send is "locked for now for safety and sends nothing"; the last line says "in preparation (not usable yet): open, export, update, uninstall, menu".)</p>
+<ul>
+<li>Adding any other word after <code>help</code> prints <code>help 는 뒤에 글자를 받지 않습니다. kakao help 만 입력하세요.</code> ("help takes no extra words. Type only kakao help.") (exit code 1).
 </li>
 <li><code>.\kakao.cmd status</code> only reads and shows the kit version, the KakaoTalk version and whether it is running, the sending mode and the number of allowed rooms (exit code 0). The login state, monitor scaling and recent errors are ⏳ step 10.
 </li>
@@ -387,6 +402,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <thead><tr><th>Command</th><th>Status</th><th>What it does</th><th>Step</th></tr></thead>
 <tbody>
 <tr><td><code>kakao version</code></td><td>✅ Available</td><td>Shows the kit version. Output: <code>카카오톡 키트 1.0.0</code></td><td>1</td></tr>
+<tr><td><code>kakao help</code></td><td>✅ Available</td><td>Shows the commands you can use and, separately, the features that do not exist yet ("in preparation"). Does not touch KakaoTalk, the settings or the records. Adding any word after it is exit code 1.</td><td>11</td></tr>
 <tr><td><code>kakao help</code></td><td>⏳ Planned</td><td>Shows Korean help with examples.</td><td>11</td></tr>
 <tr><td><code>kakao status</code></td><td>✅ Available (minimal)</td><td>Only reads and shows the kit version, the KakaoTalk version and whether it is running, the sending mode (full / read-only), the number of allowed rooms and of rooms with AI permission, and whether sending is locked. The login state, monitor scaling and recent errors are added in step 10.</td><td>10</td></tr>
 <tr><td><code>kakao rooms (list | add | remove | set)</code></td><td>✅ Available</td><td>Manages allowed rooms: <code>rooms list</code>, <code>rooms add &lt;room&gt; --type open|self|normal [--self-only] --human</code>, <code>rooms remove &lt;room&gt; --human</code>, <code>rooms set &lt;room&gt; &lt;aiRead|aiSend|canSend|noDraft&gt; &lt;on|off&gt; --human</code>. <code>list</code> is for anyone; the rest are for a person only (<code>--human</code> plus keyboard input). The design's "register only when the search shows exactly one exact-name match" needs KakaoTalk to be operated and does not exist yet (⏳); for now <code>add</code> registers by name only, and AI read and send are both off at first.</td><td>11</td></tr>
@@ -703,6 +719,18 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <a id="changelog"></a>
 <h2>14. Update summary (click to expand)</h2>
 <p>Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The test counts are the number of automated tests that passed at that point.</p>
+<details>
+<summary><strong>Help command `kakao help` added (2026-11-15)</strong> — tests 496 → 499</summary>
+<ul>
+<li>There was no place that told the user which commands can be used. <code>help</code> shows only the connected commands as "usable" and writes the features that do not exist yet (open, export, update, uninstall, menu) only on an "in preparation" line. It never claims a missing feature exists.
+</li>
+<li>The "no command" and "unknown command" hints now point to <code>kakao help</code> (before, pointing to a command that did not exist made the hint go in circles, so a test blocked it; that test was changed together with this).
+</li>
+<li>A test checks that the help list never drifts from the real command list in the code. It does not operate KakaoTalk and sends no keys or clicks.
+</li>
+<li>Limit: the forms <code>--help</code>, <code>-h</code> and <code>/?</code> are still treated as unknown commands (the hint points to <code>kakao help</code>).
+</li></ul>
+</details>
 <details>
 <summary><strong>Room opening made structure-based, and a restricted Esc to close the search (2026-11-15)</strong> — tests 481 → 496</summary>
 <ul>
@@ -1214,7 +1242,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <div class="table-wrap"><table>
 <thead><tr><th>Test file</th><th>Count</th><th>What it checks</th></tr></thead>
 <tbody>
-<tr><td><code>Bootstrap.Tests.ps1</code></td><td>24</td><td>Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, <code>시작.bat</code> working with special characters in the folder name, <code>.gitignore</code> entries, behaviour of <code>version</code> and of an unknown command, no pointer to a <code>help</code> command that does not exist, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not</td></tr>
+<tr><td><code>Bootstrap.Tests.ps1</code></td><td>27</td><td>Rules against Korean text corruption (BOM, line ends), no administrator request and no writing to Program Files or HKLM, Korean messages and the data folder location, the rule that fixes the error setting, <code>시작.bat</code> working with special characters in the folder name, <code>.gitignore</code> entries, behaviour of <code>version</code>, <code>help</code> and of an unknown command, the help list never drifting from the real commands, computing the data folder on a drive that does not exist, which paths run special characters in an argument and which do not</td></tr>
 <tr><td><code>Config.Tests.ps1</code></td><td>34</td><td>Allowed list, permissions, only a person may change, consent, strange hand-edited settings, per-room <code>noDraft</code> (draft-free) mark</td></tr>
 <tr><td><code>Log.Tests.ps1</code></td><td>11</td><td>Records without message text, tidying the record file, error report</td></tr>
 <tr><td><code>Guard.Tests.ps1</code></td><td>59</td><td>The gatekeeper: window check, allowed keys, pressed-key check (only the Hangul key is exempt), human-hand detection, lock against running twice, click safety, no dangerous key code such as Esc in the source, reading real Windows features (no input is sent), retrying to bring the target window to the front up to 3 times (stops if a person touches the keyboard or mouse), raising only the window without keys or clicks (process and title check, 3 tries, human-hand detection), <code>Esc</code> can be sent only when the title is the main window (on both the PowerShell and C# sides; never to a room window; every other key is still refused)</td></tr>
@@ -1231,7 +1259,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-All.ps1 -Name Con
 <tr><td><code>Foreground.Tests.ps1</code></td><td>9</td><td>Waiting for the front window (fake clock and fake window): goes on after 2 seconds with no guidance when already in front, the guidance appears only once while waiting, the 2 seconds restart after a brief departure, stops with no input after 120 seconds (exit code 2), succeeds when stable exactly at 120 seconds and fails when later (boundary), a failing check stops with the original error, a missing window handle or required member is refused, the source has no keys, clicks or focus changes, and the real provider only reads</td></tr>
 <tr><td><code>InfoCommands.Tests.ps1</code></td><td>26</td><td>The <code>rooms</code>, <code>read</code>, <code>search</code> and <code>status</code> command layer (temporary folder, synthetic data and fake install information only): <code>rooms list</code> (when empty; a value that is not a real true counts as no), changes to the allowed list refused without <code>--human</code> or with redirected input and changing nothing, <code>add</code> (AI permissions off, the note, a duplicate refused, errors in kind, name and argument count), <code>remove</code>, <code>set</code> (lower-case on/off only), sub-command errors, <code>read</code> (person and AI permission, <code>--since</code> with a fixed clock, 13 option errors, no export gives exit code 3, control characters removed, no text in the records), <code>search</code> (letter for letter, the AI permission range, word length and option errors, no word in the records), <code>status</code> (full and read-only mode, not installed, sending locked, arguments refused, no config file created), and running <code>kakao.cmd</code> in a new process</td></tr>
 <tr><td><code>Verify.Tests.ps1</code></td><td>9</td><td>The judgement for confirming a sent message (a pure function that does not touch KakaoTalk, the clipboard, keys or files): confirmed only when the same text appears at or after the send minute; an old message or a different text (length, letter case, symbols, emoji) is unknown; only line-ending style and trailing spaces are ignored; a room where the sender cannot be told apart is always unknown; the number of matches is returned (a duplicate send is suspected); messages with no known time and odd input never throw and give unknown</td></tr>
-<tr><td><strong>Total</strong></td><td><strong>496</strong></td><td></td></tr>
+<tr><td><strong>Total</strong></td><td><strong>499</strong></td><td></td></tr>
 </tbody></table></div>
 <h3>Building the guide html</h3>
 <p>The sources of the guide are <code>README.md</code> and <code>README.en.md</code>. The html is made with the tool below and must not be edited by hand.</p>
