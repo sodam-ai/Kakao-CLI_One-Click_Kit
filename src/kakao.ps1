@@ -38,7 +38,7 @@ function Invoke-KakaoCommand {
         }
         'send' {
             # 보내기에 필요한 부품은 이 명령일 때만 불러온다(version 등 다른 명령은 카카오톡 관련 부품을 건드리지 않는다).
-            foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'InputProbe', 'Foreground', 'Send', 'SendCommand') {
+            foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'InputProbe', 'Foreground', 'Verify', 'Send', 'SendCommand') {
                 . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
             }
             return (Invoke-SendCommand -Argv @($Argv | Select-Object -Skip 1))

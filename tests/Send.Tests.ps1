@@ -1,5 +1,5 @@
 ﻿$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$libs = @('Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'Send')
+$libs = @('Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'Verify', 'Send')
 . (Join-Path $here '_Load.ps1')
 
 # 가짜 제공자: 모드·시계·방 열기·입력·확인을 시험이 정하고, 호출을 모두 기록한다. 실제 카카오톡은 건드리지 않는다.
@@ -38,7 +38,7 @@ function New-FakeSendProvider {
         LockHeld   = { [void]$s.Calls.Add('LockHeld'); $s.LockHeld }.GetNewClosure()
         # 키가 나가기 전에 멈추면 KeysSent 를 켜지 않고 던진다. 키가 나간 뒤 멈추면 KeysSent 를 켜고 던진다.
         PasteEnter = { param($hwnd, $text, $title, $progress) [void]$s.Bodies.Add($text); [void]$s.Calls.Add(('PasteEnter:{0}:{1}' -f $hwnd, $title)); if ($s.PreKeyThrows) { throw $s.PreKeyThrows }; $progress.KeysSent = $true; if ($s.PasteThrows) { throw 'paste interrupted' } }.GetNewClosure()
-        VerifySent = { param($room, $text, $attemptId) [void]$s.Calls.Add('Verify'); if ($s.VerifyThrows) { throw 'verify broke' }; $s.Verify }.GetNewClosure()
+        VerifySent = { param($room, $text, $attemptId, $sentAt) [void]$s.Calls.Add('Verify'); $s.VerifySentAt = $sentAt; if ($s.VerifyThrows) { throw 'verify broke' }; $s.Verify }.GetNewClosure()
         CloseRoom  = { param($opened) [void]$s.Calls.Add(('Close:{0}' -f $opened.Hwnd)); if ($s.CloseThrows) { throw 'close failed' } }.GetNewClosure()
     }
     return $s
@@ -535,6 +535,40 @@ Describe 'Send: 결과는 확인됨·불명 둘 중 하나이고 자동 재시�
     }
 }
 
+Describe 'Send: 보낸 글 확인(VerifySent)에 보낸 시각을 넘긴다 (읽기 연결, 실제 내보내기는 아직 없음)' {
+    It 'hands the send time (local) taken after the room is open and before the keys go out' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeSendProvider
+            $f.Verify = $true
+            [void](Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider)
+            $f.VerifySentAt | Should BeOfType [datetime]
+            $f.VerifySentAt.ToUniversalTime() | Should Be $f.Now
+            $f.VerifySentAt.Kind | Should Be 'Local'
+        }
+    }
+
+    It 'the real provider has no exporter yet: it never confirms, never throws, and Ready stays locked' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $real = Get-DefaultSendProvider
+            $out = @(& $real.VerifySent '테스트방' 'hi' 'id1' ([datetime]::Now))
+            ($out.Count -eq 1 -and $out[0] -is [bool] -and $out[0] -eq $true) | Should Be $false
+            [bool](& $real.Ready) | Should Be $false
+        }
+    }
+
+    It 'the real provider confirms through the Verify judgement once an exporter gives exactly one match (self-only room)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $real = Get-DefaultSendProvider
+            $since = [datetime]'2026-11-15 13:05:40'
+            $script:SendExporter = { param($room, $s) @([pscustomobject]@{ Timestamp = [datetime]'2026-11-15 13:06:00'; Sender = '나'; Text = 'hi' }) }
+            try { $out = @(& $real.VerifySent '테스트방' 'hi' 'id1' $since) } finally { $script:SendExporter = $null }
+            ($out.Count -eq 1 -and $out[0] -is [bool] -and $out[0] -eq $true) | Should Be $true
+        }
+    }
+}
 Describe 'Send: 본문은 변형 없이 붙여넣기까지 전달된다' {
     It 'passes quotes, & | ^ % !, emoji, tabs and multiple lines through letter for letter' {
         Use-TempHome {

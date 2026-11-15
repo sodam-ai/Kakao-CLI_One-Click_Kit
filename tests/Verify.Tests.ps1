@@ -71,6 +71,30 @@ Describe 'Verify: 내보낸 메시지에서 방금 보낸 글 찾기' {
         (Find-SentMessageInExport -Messages @([pscustomobject]@{ Timestamp = 'not a date'; Sender = 'a'; Text = '안녕' }) -Text '안녕' -Since $t0 -SelfOnly $true).State | Should Be 'unknown'
     }
 
+    It 'confirms only when the exporter yields exactly one match, and hands the room and send minute to the exporter' {
+        $t0 = [datetime]'2026-11-15 13:05:40'
+        $script:seen = @{}
+        $exp = { param($room, $since) $script:seen.Room = $room; $script:seen.Since = $since; @((New-Msg '안녕' ([datetime]'2026-11-15 13:05:00'))) }
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $exp) | Should Be $true
+        $script:seen.Room | Should Be '방'
+        $script:seen.Since | Should Be $t0
+    }
+
+    It 'stays unknown (false) for no match, two matches, a non-self-only room, a missing exporter result or an exporter that throws' {
+        $t0 = [datetime]'2026-11-15 13:05:40'
+        $one = { param($r, $s) @((New-Msg '안녕' ([datetime]'2026-11-15 13:06:00'))) }
+        $two = { param($r, $s) @((New-Msg '안녕' ([datetime]'2026-11-15 13:06:00')), (New-Msg '안녕' ([datetime]'2026-11-15 13:07:00'))) }
+        $none = { param($r, $s) @((New-Msg '다른 글' ([datetime]'2026-11-15 13:06:00'))) }
+        $nul = { param($r, $s) $null }
+        $boom = { param($r, $s) throw 'export broke' }
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $two) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $none) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $false -Export $one) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $nul) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $boom) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since $t0 -SelfOnly $true -Export $null) | Should Be $false
+        (Confirm-SentMessage -Room '방' -Text '안녕' -Since 'nope' -SelfOnly $true -Export $one) | Should Be $false
+    }
     It 'is a pure judgement: no keys, clicks, clipboard, windows, files or logging in the source' {
         $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\Verify.ps1'))
         $code = (($text -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
