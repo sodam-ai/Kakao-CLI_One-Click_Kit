@@ -293,6 +293,55 @@ Describe 'Ocr: 배율이 다른 모니터(같은 창을 배율로 나눠 판정)
         $e | Should BeNullOrEmpty
         (Get-KitWindowScale -Hwnd 0) | Should Be 1
     }
+
+    # D-24: 카카오톡 창은 "시스템 DPI 인식"이라 150% 모니터에서도 창 DPI 가 96 으로 나온다(2026-11-10 실측). 화면에 보이는 크기는 모니터 배율을 따르므로 모니터 값을 우선한다.
+    It 'Select-KitDpi prefers the monitor DPI, because a system-aware window reports 96 on a 150% monitor (D-24)' {
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 | Should Be 144
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 144 | Should Be 144
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 96 | Should Be 96
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 96 | Should Be 96
+    }
+
+    It 'Select-KitDpi falls back to the window DPI and then to 96 when a value is unknown' {
+        Select-KitDpi -WindowDpi 144 -MonitorDpi 0 | Should Be 144
+        Select-KitDpi -WindowDpi 0 -MonitorDpi 120 | Should Be 120
+        Select-KitDpi -WindowDpi 0 -MonitorDpi 0 | Should Be 96
+        Select-KitDpi -WindowDpi -1 -MonitorDpi -1 | Should Be 96
+    }
+
+    It 'Get-KitWindowScale answers a plausible scale (1.0 to 3.0) for every visible window on this PC' {
+        Enable-KitDpiAwareness
+        foreach ($h in [KakaoWin32]::TopLevelWindows()) {
+            if (-not [KakaoWin32]::IsVisible($h)) { continue }
+            $s = Get-KitWindowScale -Hwnd $h
+            ($s -ge 1.0 -and $s -le 3.0) | Should Be $true
+        }
+    }
+
+    # D-24 보강(2026-11-11, Codex 검증 지적): 모니터 DPI 는 호출한 스레드가 모니터별 DPI 인식(2)일 때만 믿을 수 있다.
+    # 아니면(시스템 인식 1, 비인식 0, 모름 -1) 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아나므로 믿지 않고 창 값을 쓴다(= 고치기 전 동작).
+    It 'Select-KitDpi trusts the monitor DPI only when the calling thread is per-monitor aware (awareness 2)' {
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 2 | Should Be 144
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 1 | Should Be 96
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness 0 | Should Be 96
+        Select-KitDpi -WindowDpi 96 -MonitorDpi 144 -Awareness -1 | Should Be 96
+        Select-KitDpi -WindowDpi 0 -MonitorDpi 144 -Awareness 1 | Should Be 96
+        Select-KitDpi -WindowDpi 120 -MonitorDpi 144 -Awareness 1 | Should Be 120
+    }
+
+    It 'Enable-KitDpiAwareness makes the main thread of a fresh process per-monitor aware (the DPI fix depends on it)' {
+        $win32 = Join-Path $kitLibDir 'Win32.ps1'
+        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ". '$win32'; Enable-KitDpiAwareness; [KakaoWin32]::ThreadDpiAwareness()"
+        ([string]($out | Select-Object -Last 1)).Trim() | Should Be '2'
+    }
+
+    It 'Get-KitWindowScale hands the real thread awareness to Select-KitDpi' {
+        Enable-KitDpiAwareness
+        $expected = [KakaoWin32]::ThreadDpiAwareness()
+        Mock Select-KitDpi { return 96 }
+        [void](Get-KitWindowScale -Hwnd 0)
+        Assert-MockCalled Select-KitDpi -Exactly 1 -ParameterFilter ([scriptblock]::Create('$Awareness -eq ' + $expected))
+    }
 }
 
 Describe 'Ocr: 창 크기 확인과 멈춘 이유 (읽기만 하는 도우미)' {
@@ -432,6 +481,52 @@ Describe 'Ocr: 화면 글자 읽기 엔진' {
             $word.Left | Should BeGreaterThan ($lines[0].Left - 0.5)
             $word.Right | Should BeLessThan ($lines[0].Right + 0.5)
         }
+    }
+}
+
+Describe 'Ocr: Test-OpenChatTabLines (첫 클릭 전 탭 확인, 화면 없이 판정)' {
+    # 실제 화면(2026-11-12 읽기 전용 측정, 창 588x753): 친구 탭의 맨 윗줄 제목은 "친구"(창 폭 0.223, 높이 0.097).
+    # 사용자가 "오픈채팅 탭"이라고 한 화면은 제목 "채팅"(0.223, 0.097)과 갈래 이름 "오픈채팅"(0.388, 0.097; 글자 읽기는 "오픈치l팅 •" 로 읽음)이 함께 있다.
+    # 픽셀로 옮긴 값이다.
+    $hdrX = 131; $hdrTop = 73; $hdrBottom = 95
+    $subX = 228
+    $sub = New-Line '오픈치l팅 •' $subX $hdrTop $hdrBottom
+    function Test-Tab($lines) { return (Test-OpenChatTabLines -Lines $lines -ImageWidth $W -ImageHeight $H) }
+
+    It 'is true on the measured screen: the chats title plus the open-chat branch label (the reader may garble the label)' {
+        Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom), $sub, $row1Name) | Should Be $true
+    }
+
+    It 'is true when the reader joins the title and the branch label into one line (seen on the real screen)' {
+        Test-Tab @((New-Line '채팅오픈치l팅•' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $true
+    }
+
+    It 'is false for one joined line that has no open-chat label after the title' {
+        Test-Tab @((New-Line '채팅전체' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    }
+
+    It 'tolerates a space inside the title and a cleanly read label' {
+        Test-Tab @((New-Line '채 팅' $hdrX $hdrTop $hdrBottom), (New-Line '오픈채팅' $subX $hdrTop $hdrBottom)) | Should Be $true
+    }
+
+    It 'is false on the friends tab, because the same spot there is the add-friend button' {
+        Test-Tab @((New-Line '친구' $hdrX $hdrTop $hdrBottom), $row1Name) | Should Be $false
+    }
+
+    It 'is false when only the chats title was read (the branch label is missing)' {
+        Test-Tab @((New-Line '채팅' $hdrX $hdrTop $hdrBottom)) | Should Be $false
+    }
+
+    It 'is false when the words appear only lower in the window (a room name or preview is not the header)' {
+        Test-Tab @((New-Line '채팅' 220 300 324), (New-Line '오픈채팅방' 228 330 354), $row1Name) | Should Be $false
+    }
+
+    It 'is false when the title line has extra characters (another word, not the title)' {
+        Test-Tab @((New-Line '채팅방' $hdrX $hdrTop $hdrBottom), $sub) | Should Be $false
+    }
+
+    It 'is false when nothing could be read' {
+        Test-Tab @() | Should Be $false
     }
 }
 

@@ -155,6 +155,61 @@ Describe 'Status: 검증된 버전인지 판정한다 (모르면 검증 안 됨)
     }
 }
 
+Describe 'Status: 검증 안 된 버전이면 보내기를 잠근다 (읽기 전용 모드, 종료 코드 4)' {
+    It 'is full mode when the installed version is on the verified list' {
+        $p = New-FakeInstallProvider -Registry '26.9.0.5337' -Processes @(New-FakeProcess '26.9.0.5337')
+        Get-KitMode -Provider $p -VerifiedList @('26.9.0.5337') | Should Be 'full'
+    }
+
+    It 'is readonly mode for a version that is not on the list (a newer version that was never tested)' {
+        $p = New-FakeInstallProvider -Registry '26.9.2.5342' -Processes @(New-FakeProcess '26.9.2.5342')
+        Get-KitMode -Provider $p -VerifiedList @('26.9.0.5337') | Should Be 'readonly'
+    }
+
+    It 'is readonly mode whenever the version cannot be trusted: not installed, read error, registry and process disagree, empty list' {
+        $list = @('26.9.0.5337')
+        Get-KitMode -Provider (New-FakeInstallProvider) -VerifiedList $list | Should Be 'readonly'
+        Get-KitMode -Provider (New-FakeInstallProvider -Registry '26.9.0.5337' -RegistryThrows) -VerifiedList $list | Should Be 'readonly'
+        Get-KitMode -Provider (New-FakeInstallProvider -Registry '26.9.0.5337' -Processes @(New-FakeProcess '26.9.2.5342')) -VerifiedList $list | Should Be 'readonly'
+        Get-KitMode -Provider (New-FakeInstallProvider -Registry '26.9.0.5337') -VerifiedList @() | Should Be 'readonly'
+    }
+
+    It 'sending is allowed in full mode, for a person and for an AI caller (AI permission is a separate room switch)' {
+        Test-SendAllowedByMode -Mode 'full' | Should Be $true
+        Test-SendAllowedByMode -Mode 'full' -Caller 'ai' | Should Be $true
+    }
+
+    It 'sending is locked in readonly mode' {
+        Test-SendAllowedByMode -Mode 'readonly' | Should Be $false
+        Test-SendAllowedByMode -Mode 'readonly' -Caller 'ai' | Should Be $false
+    }
+
+    It 'only a person can lift the lock with the allow-unverified switch; an AI caller cannot' {
+        Test-SendAllowedByMode -Mode 'readonly' -AllowUnverified | Should Be $true
+        Test-SendAllowedByMode -Mode 'readonly' -AllowUnverified -Caller 'human' | Should Be $true
+        Test-SendAllowedByMode -Mode 'readonly' -AllowUnverified -Caller 'ai' | Should Be $false
+    }
+
+    It 'locks (fail closed) for any mode value it does not know, even with the allow-unverified switch' {
+        foreach ($bad in @($null, '', ' ', 'FULL', 'full ', ' full', 'Full', 'readOnly', 'write', 'true', '1')) {
+            Test-SendAllowedByMode -Mode $bad | Should Be $false
+            Test-SendAllowedByMode -Mode $bad -AllowUnverified | Should Be $false
+        }
+    }
+
+    It 'Assert-SendAllowedByMode stops with exit code 4 and a Korean message when locked, and does nothing when allowed' {
+        $e = Get-ThrownError { Assert-SendAllowedByMode -Mode 'readonly' }
+        $e | Should Not BeNullOrEmpty
+        $e.ExitCode | Should Be 4
+        $e.Message | Should Match '보내기가 잠겨'
+        $e.Message | Should Match '아무것도 보내지 않았습니다'
+        (Get-ThrownError { Assert-SendAllowedByMode -Mode 'readonly' -AllowUnverified -Caller 'ai' }).ExitCode | Should Be 4
+        (Get-ThrownError { Assert-SendAllowedByMode -Mode $null }).ExitCode | Should Be 4
+        Get-ThrownError { Assert-SendAllowedByMode -Mode 'full' } | Should BeNullOrEmpty
+        Get-ThrownError { Assert-SendAllowedByMode -Mode 'readonly' -AllowUnverified } | Should BeNullOrEmpty
+    }
+}
+
 Describe 'Status: 읽기만 한다' {
     It 'Status.ps1 has no cmdlet that writes, creates or deletes anything' {
         $text = [System.IO.File]::ReadAllText((Join-Path $kitLibDir 'Status.ps1'))

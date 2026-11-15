@@ -13,6 +13,9 @@ function New-FakeProvider {
         RootAtPoint = 100
         Tick        = 1000
         Idle        = 5000
+        SetCount    = 0
+        RaiseOn     = 0
+        TickOnSet   = $null
         IdleQueue   = (New-Object 'System.Collections.Generic.Queue[int]')
         SendStatus  = 0
         ClickStatus = 0
@@ -22,7 +25,12 @@ function New-FakeProvider {
         ProcessName   = { param($h) $state.Process }.GetNewClosure()
         Title         = { param($h) $state.Title }.GetNewClosure()
         Foreground    = { $state.Foreground }.GetNewClosure()
-        SetForeground = { param($h) [void]$state.Calls.Add('SetForeground') }.GetNewClosure()
+        # RaiseOn: n번째 SetForeground 부터 대상 창이 맨 앞이 된다(0 이면 맨 앞이 바뀌지 않음). TickOnSet: 이 호출 뒤 "마지막 입력 시각"을 바꿔 사람 손을 흉내 낸다.
+        SetForeground = { param($h)
+            [void]$state.Calls.Add('SetForeground')
+            $state.SetCount++
+            if ($state.RaiseOn -gt 0 -and $state.SetCount -ge $state.RaiseOn) { $state.Foreground = $h }
+            if ($null -ne $state.TickOnSet) { $state.Tick = $state.TickOnSet } }.GetNewClosure()
         SendCombo     = { param($h, $title, $vks, $baseline)
             [void]$state.Calls.Add(('Combo:{0}:{1}' -f $h, (($vks | ForEach-Object { '{0:X2}' -f $_ }) -join ',')))
             $state.SendStatus }.GetNewClosure()
@@ -106,7 +114,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'sends each whitelisted combo as ONE native call (Ctrl+key, or Enter)' {
-        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+A' = '11,41'; 'Ctrl+C' = '11,43'; 'Enter' = '0D' }
+        $expected = @{ 'Ctrl+S' = '11,53'; 'Ctrl+V' = '11,56'; 'Ctrl+C' = '11,43'; 'Ctrl+F' = '11,46'; 'Enter' = '0D' }
         foreach ($combo in $expected.Keys) {
             $f = New-FakeProvider
             Initialize-Guard $f
@@ -116,7 +124,7 @@ Describe 'Guard: Send-KeyCombo' {
     }
 
     It 'refuses every key outside the whitelist before touching anything (Esc closes the chat window)' {
-        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'Ctrl+S ', 'F5', '') {
+        foreach ($bad in 'Esc', 'Escape', 'Alt+F4', 'Delete', 'Ctrl+W', 'Ctrl+Shift+S', 'ctrl+s', 'ctrl+f', 'Ctrl+A', 'Ctrl+Shift+F', 'Ctrl+S ', 'F5', '') {
             $f = New-FakeProvider
             Initialize-Guard $f
             $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys $bad -ExpectedTitle '비밀방' -Provider $f.Provider }
@@ -283,7 +291,7 @@ Describe 'Guard: 사용자 간섭' {
     It 'lets two kit inputs follow each other when nobody else touched anything' {
         $f = New-FakeProvider
         Initialize-Guard $f
-        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+A' -ExpectedTitle '비밀방' -Provider $f.Provider
+        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+S' -ExpectedTitle '비밀방' -Provider $f.Provider
         Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+C' -ExpectedTitle '비밀방' -Provider $f.Provider
         (Get-InputCalls $f).Count | Should Be 2
     }
@@ -291,7 +299,7 @@ Describe 'Guard: 사용자 간섭' {
     It 'stops the second input when the user touched something between two kit inputs' {
         $f = New-FakeProvider
         Initialize-Guard $f
-        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+A' -ExpectedTitle '비밀방' -Provider $f.Provider
+        Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+S' -ExpectedTitle '비밀방' -Provider $f.Provider
         (Get-InputCalls $f).Count | Should Be 1
         $f.Tick = 2500
         $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Ctrl+C' -ExpectedTitle '비밀방' -Provider $f.Provider }
@@ -430,9 +438,16 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
 
     It 'the native layer refuses Esc, Alt+F4, Delete, Ctrl+W and Shift combos by itself (status 6)' {
         # 이 시험은 입력을 보내지 않는다: 허용 표에 없으면 창을 확인하기도 전에 6을 돌려준다.
-        foreach ($combo in @(27), @(0x11, 0x57), @(0x12, 0x73), @(0x2E), @(0x11, 0x10, 0x53), @(0x11, 0x53, 0x0D), @()) {
+        # Ctrl+A(0x11, 0x41)는 카카오톡 메인 창에서 "친구 추가" 단축키라서 막는다(2026-11-12 화면에서 확인).
+        foreach ($combo in @(27), @(0x11, 0x57), @(0x11, 0x41), @(0x12, 0x73), @(0x2E), @(0x11, 0x10, 0x53), @(0x11, 0x53, 0x0D), @()) {
             [KakaoWin32]::SendCombo(0, 'x', [byte[]]$combo, 0) | Should Be 6
         }
+    }
+
+    It 'the native layer allows Ctrl+F (it gets past the key table and stops at the window check, status 1) and still refuses Ctrl+Shift+F' {
+        # 입력을 보내지 않는다: 창 번호 0 은 카카오톡 창이 아니라서 허용 표를 통과한 뒤 1 에서 멈춘다.
+        [KakaoWin32]::SendCombo(0, 'x', [byte[]](0x11, 0x46), 0) | Should Be 1
+        [KakaoWin32]::SendCombo(0, 'x', [byte[]](0x11, 0x10, 0x46), 0) | Should Be 6
     }
 
     It 'the native layer refuses a window that is not KakaoTalk (status 1) and bad click counts (status 10)' {
@@ -476,5 +491,64 @@ Describe 'Guard: 실제 Win32 (입력은 보내지 않는다)' {
         $ignored = @([KakaoWin32]::IgnoredHeldKeys())
         $ignored.Count | Should Be 1
         $ignored[0] | Should Be 0x15
+    }
+}
+
+
+Describe 'Guard: 창 올리기 재시도 (2번 시험 앞 3회 "맨 앞에 없음" 정지의 원인을 모른 채 보강)' {
+    It 'raises the window again when the first try did not bring it to the front, up to 3 tries, then sends once' {
+        foreach ($raiseOn in 1, 2, 3) {
+            $f = New-FakeProvider
+            Initialize-Guard $f
+            $f.Foreground = 999
+            $f.RaiseOn = $raiseOn
+            Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider
+            $f.SetCount | Should Be $raiseOn
+            ((Get-InputCalls $f) -join '|') | Should Be 'Combo:100:0D'
+        }
+    }
+
+    It 'gives up after 3 tries with exit 2 and sends nothing' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 4
+        $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider }
+        $e.ExitCode | Should Be 2
+        $e.Message | Should Match '맨 앞'
+        $f.SetCount | Should Be 3
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'does not retry when the window is already in front (one raise, as before)' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider
+        $f.SetCount | Should Be 1
+    }
+
+    It 'stops at once, without raising again, when a person touched the keyboard or mouse during a try' {
+        $f = New-FakeProvider
+        Initialize-Guard $f
+        $f.Foreground = 999
+        $f.RaiseOn = 3
+        $f.TickOnSet = 2500
+        $e = Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider }
+        $e.ExitCode | Should Be 2
+        $e.Message | Should Match '키보드나 마우스'
+        $f.SetCount | Should Be 1
+        (Get-InputCalls $f).Count | Should Be 0
+    }
+
+    It 'a window that comes to the front but is not the expected room still sends nothing (the checks after the retries are unchanged)' {
+        foreach ($case in 'Title', 'Process') {
+            $f = New-FakeProvider
+            Initialize-Guard $f
+            $f.Foreground = 999
+            $f.RaiseOn = 2
+            if ($case -eq 'Title') { $f.Title = '다른방' } else { $f.Process = 'notepad' }
+            (Get-ThrownError { Send-KeyCombo -Hwnd 100 -Keys 'Enter' -ExpectedTitle '비밀방' -Provider $f.Provider }).ExitCode | Should Be 2
+            (Get-InputCalls $f).Count | Should Be 0
+        }
     }
 }

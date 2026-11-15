@@ -112,6 +112,38 @@ function Test-MainWindowUncovered {
     return $true
 }
 
+# 맨 윗줄이 "오픈채팅을 쓸 수 있는 채팅 화면"인지 본다. 탭이 다르면 같은 자리의 아이콘이 다른 버튼이다(친구 탭에서는 검색 돋보기 자리가 친구 추가).
+# 실제 화면(2026-11-12 읽기 전용 측정, 창 588x753): 친구 탭 = 제목 "친구"(창 폭 0.223, 높이 0.097).
+# 사용자가 "오픈채팅 탭"이라고 한 화면 = 제목 "채팅"(0.223, 0.097) + 갈래 이름 "오픈채팅"(0.388, 0.097, 글자 읽기는 "오픈치l팅 •" 로 읽음).
+# 그래서 맨 윗줄(높이 0.05~0.13)에서 (가) 폭 0.15~0.35 의 글자가 공백을 뺀 "채팅"과 같고 (나) 폭 0.30~0.55 의 글자가 "오픈"으로 시작할 때만 참이다.
+# 갈래 이름은 글자 읽기가 자주 틀려서 앞 두 글자만 본다. 갈래가 "오픈채팅"으로 선택돼 있는지는 글자로 알 수 없어 확인하지 못한다.
+# 읽은 글자가 없거나 위 두 조건 중 하나라도 빠지면 거짓이다(방을 열지 않는 쪽으로만 틀린다).
+function Test-OpenChatTabLines {
+    param($Lines, [double]$ImageWidth, [double]$ImageHeight)
+    if ($ImageWidth -le 0 -or $ImageHeight -le 0) { return $false }
+    $hasTitle = $false
+    $hasBranch = $false
+    foreach ($line in @($Lines)) {
+        $fx = $line.Left / $ImageWidth
+        $fy = $line.Top / $ImageHeight
+        if ($fy -lt 0.05 -or $fy -gt 0.13) { continue }
+        $text = [string]$line.Text -replace '\s', ''
+        if ($fx -ge 0.15 -and $fx -le 0.35 -and [string]::Equals($text, '채팅', 'Ordinal')) { $hasTitle = $true }
+        # 글자 읽기가 제목과 갈래 이름을 한 줄로 붙여 읽는 경우("채팅오픈치l팅•", 실제 화면에서 봄): "채팅" 바로 뒤가 "오픈"일 때만 둘 다 있는 것으로 본다.
+        elseif ($fx -ge 0.15 -and $fx -le 0.35 -and $text.StartsWith('채팅오픈', [System.StringComparison]::Ordinal)) { $hasTitle = $true; $hasBranch = $true }
+        elseif ($fx -ge 0.30 -and $fx -le 0.55 -and $text.StartsWith('오픈', [System.StringComparison]::Ordinal)) { $hasBranch = $true }
+    }
+    return ($hasTitle -and $hasBranch)
+}
+
+# 메인 창이 지금 오픈채팅 탭인지 화면에서 읽는다. 읽기만 하고 입력하지 않는다. 가려져 있거나 읽지 못하면 거짓이다.
+function Test-OpenChatTab {
+    param([Parameter(Mandatory)][long]$Hwnd)
+    $r = Get-SearchResultLines -Hwnd $Hwnd
+    if ($r.Covered) { return $false }
+    return (Test-OpenChatTabLines -Lines $r.Lines -ImageWidth $r.Width -ImageHeight $r.Height)
+}
+
 # 카카오톡 메인 창 화면을 캡처해(메모리에서만) 글자를 읽는다. 돌려주는 값: Lines(줄 목록), Width·Height(캡처 크기 픽셀), Scale(창이 놓인 모니터의 배율), Covered(가려져 있으면 참).
 # 판정 영역이 가려져 있으면 읽지 않고 Covered 를 참으로 돌려준다(그러면 아래 판정은 거짓이 되어 방을 열지 않는다).
 function Get-SearchResultLines {

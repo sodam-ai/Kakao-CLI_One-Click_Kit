@@ -18,6 +18,26 @@ function Invoke-KakaoCommand {
             Write-Host (Get-Msg -Key 'version.banner' -FormatArgs @(Get-KitVersion))
             return 0
         }
+        'send' {
+            # 보내기에 필요한 부품은 이 명령일 때만 불러온다(version 등 다른 명령은 카카오톡 관련 부품을 건드리지 않는다).
+            foreach ($name in 'Errors', 'Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'InputProbe', 'Send', 'SendCommand') {
+                . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+            }
+            return (Invoke-SendCommand -Argv @($Argv | Select-Object -Skip 1))
+        }
+        { $_ -cin 'rooms', 'read', 'search', 'status' } {
+            # 읽기·관리 명령: 카카오톡을 조작하지 않는다(키·클릭 없음). 이 명령일 때만 필요한 부품을 불러온다.
+            foreach ($name in 'Errors', 'Config', 'Log', 'Parse', 'Export', 'Search', 'Status', 'Send', 'InfoCommands') {
+                . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+            }
+            $rest = @($Argv | Select-Object -Skip 1)
+            switch -CaseSensitive ($Argv[0]) {
+                'rooms' { return (Invoke-RoomsCommand -Argv $rest) }
+                'read' { return (Invoke-ReadCommand -Argv $rest) }
+                'search' { return (Invoke-SearchCommand -Argv $rest) }
+                'status' { return (Invoke-StatusCommand -Argv $rest) }
+            }
+        }
         default {
             Write-Host (Get-Msg -Key 'error.unknownCommand' -FormatArgs @($Argv[0]))
             return 1

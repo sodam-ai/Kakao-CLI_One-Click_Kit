@@ -28,20 +28,13 @@ function ConvertFrom-KakaoExport {
     $savedAt = $null
     $messages = New-Object 'System.Collections.Generic.List[object]'
     $currentDate = $null
+    $open = $false      # 마무리하지 않은 메시지가 있는가
     $sender = $null
     $stamp = $null
-    $body = $null
-
-    # 지금까지 모은 메시지를 마무리해 목록에 넣는다(점(.)으로 불러 이 함수의 변수를 그대로 쓴다). 끝의 빈 줄(날짜 구분선 앞 여백)은 버린다.
-    $flush = {
-        if ($null -ne $sender) {
-            $messages.Add([pscustomobject]@{
-                    Timestamp = $stamp
-                    Sender    = $sender
-                    Text      = (($body -join "`n").TrimEnd("`n"))
-                })
-        }
-    }
+    $first = $null      # 메시지 첫 줄(머리글 뒤의 글)
+    $cont = $null       # 이어지는 줄들(없으면 null: 대부분의 메시지)
+    $reDate = $script:ReExportDate
+    $reMsg = $script:ReExportMessage
 
     for ($i = 1; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
@@ -54,41 +47,56 @@ function ConvertFrom-KakaoExport {
                 continue
             }
         }
-        if ($line.Length -gt 0 -and $line[0] -eq '-') {
-            $d = $script:ReExportDate.Match($line)
+        $c0 = if ($line.Length -gt 0) { $line[0] } else { [char]0 }
+        $isDate = $false
+        $m = $null
+        if ($c0 -eq '-') {
+            $d = $reDate.Match($line)
             # 13월 45일 같은 불가능한 날짜는 날짜 줄로 보지 않는다(일반 글로 흘러가 앞 메시지의 이어지는 줄이 된다).
-            $dy = 0; $dmo = 0; $dd = 0
-            $validDate = $false
             if ($d.Success) {
                 $dy = [int]$d.Groups['y'].Value; $dmo = [int]$d.Groups['mo'].Value; $dd = [int]$d.Groups['d'].Value
-                $validDate = ($dy -ge 1 -and $dmo -ge 1 -and $dmo -le 12 -and $dd -ge 1 -and $dd -le [datetime]::DaysInMonth($dy, $dmo))
-            }
-            if ($validDate) {
-                . $flush
-                $sender = $null
-                $currentDate = New-Object DateTime $dy, $dmo, $dd
-                continue
+                $isDate = ($dy -ge 1 -and $dmo -ge 1 -and $dmo -le 12 -and $dd -ge 1 -and $dd -le [datetime]::DaysInMonth($dy, $dmo))
             }
         }
-        if ($line.Length -gt 0 -and $line[0] -eq '[') {
-            $m = $script:ReExportMessage.Match($line)
-            if ($m.Success) {
-                . $flush
-                $hour = ([int]$m.Groups['h'].Value) % 12
-                if ($m.Groups['ap'].Value -eq '오후') { $hour += 12 }
-                $sender = $m.Groups['n'].Value
-                $stamp = $null
-                if ($null -ne $currentDate) { $stamp = $currentDate.AddHours($hour).AddMinutes([int]$m.Groups['m'].Value) }
-                $body = New-Object 'System.Collections.Generic.List[string]'
-                $body.Add($m.Groups['t'].Value)
-                continue
+        elseif ($c0 -eq '[') {
+            $m = $reMsg.Match($line)
+            if (-not $m.Success) { $m = $null }
+        }
+        if ($isDate -or $null -ne $m) {
+            # 지금까지 모은 메시지를 마무리해 목록에 넣는다. 끝의 빈 줄(날짜 구분선 앞 여백)은 버린다.
+            if ($open) {
+                if ($null -eq $cont) { $text1 = $first.TrimEnd("`n") }
+                else { $text1 = ($first + "`n" + ($cont -join "`n")).TrimEnd("`n") }
+                $messages.Add([pscustomobject]@{ Timestamp = $stamp; Sender = $sender; Text = $text1 })
+                $open = $false
             }
+            if ($isDate) {
+                $currentDate = New-Object DateTime $dy, $dmo, $dd
+            }
+            else {
+                $g = $m.Groups
+                $hour = ([int]$g['h'].Value) % 12
+                if ($g['ap'].Value -eq '오후') { $hour += 12 }
+                $sender = $g['n'].Value
+                $stamp = $null
+                if ($null -ne $currentDate) { $stamp = $currentDate.AddHours($hour).AddMinutes([int]$g['m'].Value) }
+                $first = $g['t'].Value
+                $cont = $null
+                $open = $true
+            }
+            continue
         }
         # 새 메시지가 아닌 줄은 앞 메시지의 이어지는 줄이다. (머리글 아래 빈 줄처럼 앞 메시지가 아직 없으면 버린다)
-        if ($null -ne $sender) { $body.Add($line) }
+        if ($open) {
+            if ($null -eq $cont) { $cont = New-Object 'System.Collections.Generic.List[string]' }
+            $cont.Add($line)
+        }
     }
-    . $flush
-
+    if ($open) {
+        if ($null -eq $cont) { $text1 = $first.TrimEnd("`n") }
+        else { $text1 = ($first + "`n" + ($cont -join "`n")).TrimEnd("`n") }
+        $messages.Add([pscustomobject]@{ Timestamp = $stamp; Sender = $sender; Text = $text1 })
+    }
     return [pscustomobject]@{
         Room     = $head.Groups['room'].Value
         SavedAt  = $savedAt

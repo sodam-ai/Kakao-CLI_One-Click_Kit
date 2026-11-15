@@ -41,11 +41,15 @@ public static class KakaoWin32 {
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetThreadDpiAwarenessContext();
+    [DllImport("user32.dll")] static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
 
     // 입력 결과 코드: 0 성공, 1 카카오톡 창 아님, 2 제목 다름, 3 맨 앞 아님, 4 사람 손 감지(또는 기준 없음), 5 다른 키 눌림,
     // 6 허용되지 않은 키 조합, 7 클릭 자리가 다른 창에 가림, 8 마우스 위치가 바뀜, 9 입력 전달 실패, 10 잘못된 인자
     static readonly byte[][] AllowedCombos = new byte[][] {
-        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x41 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x0D }
+        new byte[] { 0x11, 0x53 }, new byte[] { 0x11, 0x56 }, new byte[] { 0x11, 0x43 }, new byte[] { 0x11, 0x46 }, new byte[] { 0x0D }
     };
 
     public static long[] TopLevelWindows() {
@@ -81,9 +85,22 @@ public static class KakaoWin32 {
         return new int[] { r.Left, r.Top, r.Right, r.Bottom };
     }
     public static long Foreground() { return GetForegroundWindow().ToInt64(); }
-    // 창이 놓인 모니터의 DPI(96 = 배율 100%, 144 = 150%). 모르면 96. 읽기만 한다.
-    public static int Dpi(long h) {
-        try { uint d = GetDpiForWindow(new IntPtr(h)); return d == 0 ? 96 : (int)d; } catch (EntryPointNotFoundException) { return 96; }
+    // 창 자신이 따르는 DPI(96 = 100%, 144 = 150%). 카카오톡 창은 "시스템 DPI 인식"이라 150% 모니터에서도 96 이 나온다. 모르면 0. 읽기만 한다.
+    public static int WindowDpi(long h) {
+        if (h == 0) return 0;
+        try { return (int)GetDpiForWindow(new IntPtr(h)); } catch (EntryPointNotFoundException) { return 0; }
+    }
+    // 창이 놓인 모니터의 실제 DPI. 화면에 보이는 창 크기는 이 값을 따른다. 창이 어느 모니터에도 없거나 읽지 못하면 0. 읽기만 한다.
+    // 호출하는 쪽 스레드가 모니터별 DPI 인식이어야 실제 값이 나온다(EnableDpiAwareness, ThreadDpiAwareness 로 확인).
+    public static int MonitorDpi(long h) {
+        if (h == 0) return 0;
+        try {
+            IntPtr m = MonitorFromWindow(new IntPtr(h), 0); // 0 = 어느 모니터에도 없으면 NULL (가장 가까운 모니터로 짐작하지 않는다)
+            if (m == IntPtr.Zero) return 0;
+            uint x, y;
+            if (GetDpiForMonitor(m, 0, out x, out y) != 0) return 0; // 0 = MDT_EFFECTIVE_DPI, 반환 0 = S_OK
+            return (int)x;
+        } catch (EntryPointNotFoundException) { return 0; } catch (DllNotFoundException) { return 0; }
     }
     public static long Root(long h) {
         if (h == 0) return 0;
@@ -131,6 +148,15 @@ public static class KakaoWin32 {
         return HeldKeyFrom(delegate (int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; });
     }
     public static void PostClose(long h) { PostMessageW(new IntPtr(h), 0x0010, IntPtr.Zero, IntPtr.Zero); }
+    // 지금 이 스레드의 DPI 인식 상태: 2 = 모니터별(MonitorDpi 를 믿을 수 있음), 1 = 시스템, 0 = 인식 안 함, -1 = 모름. 읽기만 한다.
+    // GetDpiForMonitor 의 결과는 호출한 스레드의 DPI 인식을 따르므로 프로세스가 아니라 스레드 값을 읽는다.
+    // 한계: Microsoft 문서는 모니터별 인식 스레드에서 GetDpiForMonitor 대신 GetDpiForWindow 를 권한다. 그러나 카카오톡 창은 시스템 인식이라
+    // GetDpiForWindow 가 96 으로 나오는 것이 결함(D-24)의 원인이고, 이 PC 에서 실측(창 96, 모니터 144)으로 모니터 값이 맞음을 확인해 썼다.
+    // 혼합 인식 호스트나 다른 Windows 버전에서의 동작은 확인하지 못했다.
+    // EnableDpiAwareness 는 실패를 알리지 않으므로(안 되면 시스템 인식으로 떨어질 수 있음) 배율을 믿기 전에 이 값을 확인한다.
+    public static int ThreadDpiAwareness() {
+        try { return GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()); } catch (EntryPointNotFoundException) { return -1; }
+    }
     // 가장 좋은 DPI 설정(모니터마다 배율이 달라도 실제 픽셀 좌표)을 시도하고, 안 되면 기본 설정으로 되돌아간다.
     public static void EnableDpiAwareness() {
         try { if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return; } catch (EntryPointNotFoundException) { }
@@ -227,10 +253,21 @@ function Get-DefaultInputProvider {
 # 창 좌표를 실제 화면 픽셀로 읽어야 하는 곳(화면 캡처, Ocr.ps1)이 DPI 설정을 켤 때 쓴다. [KakaoWin32]:: 호출은 이 파일에만 둔다.
 function Enable-KitDpiAwareness { [KakaoWin32]::EnableDpiAwareness() }
 
+# 창 DPI 와 모니터 DPI 중 쓸 값을 고른다. 모니터 값이 우선이다: 카카오톡 창은 "시스템 DPI 인식"이라 150% 모니터에서도 창 DPI 가 96 으로 나오지만 화면에는 150% 크기로 보인다(D-24).
+# 모니터 값은 호출한 스레드가 모니터별 DPI 인식(-Awareness 2)일 때만 믿는다: 아니면 모니터 값도 시스템 값으로 나와 같은 결함이 조용히 되살아난다(Codex 검증 지적).
+# 그때는 창 값을 쓴다(= 고치기 전 동작). 이 경로가 항상 안전하게 거절된다는 보장은 없다(DPI 가상화 상황은 미검증). 모니터 값을 모르면(0 이하) 창 값, 그것도 모르면 96(100%).
+function Select-KitDpi {
+    param([int]$WindowDpi, [int]$MonitorDpi, [int]$Awareness = 2)
+    if ($MonitorDpi -gt 0 -and $Awareness -eq 2) { return $MonitorDpi }
+    if ($WindowDpi -gt 0) { return $WindowDpi }
+    return 96
+}
+
 # 창이 놓인 모니터의 배율(1.0 = 100%, 1.5 = 150%). 알 수 없으면 1.0. DPI 설정을 켠 뒤에 불러야 실제 값이 나온다.
 function Get-KitWindowScale {
     param([long]$Hwnd)
-    return ([KakaoWin32]::Dpi($Hwnd) / 96.0)
+    $dpi = Select-KitDpi -WindowDpi ([KakaoWin32]::WindowDpi($Hwnd)) -MonitorDpi ([KakaoWin32]::MonitorDpi($Hwnd)) -Awareness ([KakaoWin32]::ThreadDpiAwareness())
+    return ($dpi / 96.0)
 }
 
 # 카카오톡 프로세스가 가진 보이는 최상위 창(저장 대화상자 같은 모달 창 포함). 읽기 전용.

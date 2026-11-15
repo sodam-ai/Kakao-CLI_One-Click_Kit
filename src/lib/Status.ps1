@@ -1,5 +1,5 @@
 ﻿# 카카오톡 설치·버전 정보(최소판). 읽기만 한다: 레지스트리 값과 실행 중인 프로세스를 읽을 뿐 아무것도 쓰거나 누르거나 열지 않는다.
-# M8 이 보내기 잠금(Test-SendAllowedByMode)을, M10 이 로그인 상태와 전체 점검을 여기에 덧붙인다.
+# 보내기 잠금(Get-KitMode·Test-SendAllowedByMode·Assert-SendAllowedByMode)은 M8 보다 먼저 여기에 있다. M10 이 로그인 상태와 전체 점검을 덧붙인다.
 
 # 실제 읽기 동작을 모은 제공자. 시험은 이 해시테이블을 가짜로 바꿔 끼운다(Guard.ps1 의 제공자 방식과 같은 생각).
 #   RegistryVersion : 버전 글자를 돌려준다. 어디에도 없으면 $null. 읽다가 실패하면 예외를 던진다.
@@ -83,6 +83,53 @@ function Get-KakaoInstallInfo {
         return [pscustomobject]@{ Installed = $true; Version = $null; Source = 'mismatch'; Running = $true; ExePath = $exePath }
     }
     return [pscustomobject]@{ Installed = $true; Version = $registryVersion; Source = 'registry+process'; Running = $true; ExePath = $exePath }
+}
+
+# 동작 모드: 설치된(실행 중이면 실행 파일과 대조한) 버전이 시험해 본 목록에 있으면 'full', 아니면 'readonly'.
+# 설치 안 됨·읽기 실패·레지스트리와 프로세스 불일치·목록 비어 있음/읽기 실패는 전부 'readonly'(모르면 잠금).
+function Get-KitMode {
+    param([hashtable]$Provider, [string[]]$VerifiedList)
+    $ErrorActionPreference = 'Stop'
+
+    $info = if ($PSBoundParameters.ContainsKey('Provider')) { Get-KakaoInstallInfo -Provider $Provider } else { Get-KakaoInstallInfo }
+    $verified = if ($PSBoundParameters.ContainsKey('VerifiedList')) {
+        Test-KakaoVersionVerified -Version $info.Version -VerifiedList $VerifiedList
+    }
+    else {
+        Test-KakaoVersionVerified -Version $info.Version
+    }
+    if ($verified) { return 'full' }
+    return 'readonly'
+}
+
+# 이 모드에서 보내기가 허용되는가. 'full' 이면 허용. 'readonly' 는 사람이 -AllowUnverified 를 직접 줬을 때만 허용하고
+# AI 호출자는 그 스위치로도 풀 수 없다. 'full'·'readonly' 가 아닌 값(null·빈 값·대소문자나 공백이 다른 값)은 모두 잠금이다.
+# -Caller 를 사람/AI 중 어느 쪽으로 넘길지는 명령 계층(M11)이 정한다: 입력이 리다이렉트된 호출은 AI 로 취급한다.
+function Test-SendAllowedByMode {
+    param(
+        [AllowNull()][AllowEmptyString()][string]$Mode,
+        [switch]$AllowUnverified,
+        [ValidateSet('human', 'ai')][string]$Caller = 'human'
+    )
+    $ErrorActionPreference = 'Stop'
+
+    if ([string]::Equals($Mode, 'full', [System.StringComparison]::Ordinal)) { return $true }
+    if ([string]::Equals($Mode, 'readonly', [System.StringComparison]::Ordinal) -and $AllowUnverified -and $Caller -ceq 'human') { return $true }
+    return $false
+}
+
+# 허용이 아니면 종료 코드 4 로 멈춘다(입력을 보내기 전에 호출할 것).
+function Assert-SendAllowedByMode {
+    param(
+        [AllowNull()][AllowEmptyString()][string]$Mode,
+        [switch]$AllowUnverified,
+        [ValidateSet('human', 'ai')][string]$Caller = 'human'
+    )
+    $ErrorActionPreference = 'Stop'
+
+    if (-not (Test-SendAllowedByMode -Mode $Mode -AllowUnverified:$AllowUnverified -Caller $Caller)) {
+        throw (New-KitError -Key 'error.sendLocked' -ExitCode 4)
+    }
 }
 
 # 이 버전이 "실제로 시험해 본 버전 목록"에 글자 그대로 있는가. 모르면(없음·비어 있음·목록을 못 읽음) $false — 안전 쪽.

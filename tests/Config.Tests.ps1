@@ -370,3 +370,48 @@ Describe 'Config: 검증된 카카오톡 버전' {
         (@(Get-VerifiedKakaoVersions) -contains '26.9.0.5337') | Should Be $true
     }
 }
+
+
+Describe 'Config: 초안 없음 표시(noDraft)' {
+    Mock Test-InputRedirected { $false }
+
+    It 'a new room starts with noDraft off' {
+        Use-TempHome {
+            Add-AllowedRoom -Name '비밀방' -Type 'open' -SelfOnly $true -Human
+            @((Get-KitConfig).rooms)[0].noDraft | Should Be $false
+        }
+    }
+
+    It 'only a person can switch it, and it is a valid permission name' {
+        Use-TempHome {
+            Add-AllowedRoom -Name '비밀방' -Type 'open' -SelfOnly $true -Human
+            (Get-ThrownError { Set-RoomPermission -Name '비밀방' -Permission noDraft -Value $true }).ExitCode | Should Be 1
+            Test-RoomNoDraft -Name '비밀방' | Should Be $false
+            Set-RoomPermission -Name '비밀방' -Permission noDraft -Value $true -Human
+            Test-RoomNoDraft -Name '비밀방' | Should Be $true
+            Set-RoomPermission -Name '비밀방' -Permission noDraft -Value $false -Human
+            Test-RoomNoDraft -Name '비밀방' | Should Be $false
+        }
+    }
+
+    It 'is false for unknown rooms, a missing field and non-boolean values' {
+        Use-TempHome {
+            Test-RoomNoDraft -Name '없는방' | Should Be $false
+            foreach ($bad in '"true"', '1', 'null', '[true]') {
+                $p = Get-KitPaths
+                New-Item -ItemType Directory -Path $p.DataDir -Force | Out-Null
+                [System.IO.File]::WriteAllText($p.ConfigFile, ('{"version":1,"rooms":[{"name":"비밀방","type":"open","verified":true,"canRead":true,"canSend":true,"selfOnly":true,"aiRead":false,"aiSend":false,"noDraft":' + $bad + '}]}'), (New-Object System.Text.UTF8Encoding($false)))
+                Test-RoomNoDraft -Name '비밀방' | Should Be $false
+            }
+            [System.IO.File]::WriteAllText((Get-KitPaths).ConfigFile, '{"version":1,"rooms":[{"name":"비밀방","type":"open","verified":true,"canRead":true,"canSend":true,"selfOnly":true,"aiRead":false,"aiSend":false}]}', (New-Object System.Text.UTF8Encoding($false)))
+            Test-RoomNoDraft -Name '비밀방' | Should Be $false
+        }
+    }
+
+    It 'still rejects a permission name that does not exist' {
+        Use-TempHome {
+            Add-AllowedRoom -Name '비밀방' -Type 'open' -SelfOnly $true -Human
+            (Get-ThrownError { Set-RoomPermission -Name '비밀방' -Permission draftFree -Value $true -Human }).ExitCode | Should Be 1
+        }
+    }
+}

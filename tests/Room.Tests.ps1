@@ -11,16 +11,18 @@ function New-FakeRoomProvider {
         OcrAvailable = $true
         ResultSingle = $true
         ResultThrows = $false
-        SelectAllThrows = $false
         Hint         = ''
+        TabOpenChat  = $true
     }
     $s.Provider = @{
         Windows        = { [void]$s.Calls.Add('Windows'); if ($s.WindowsQueue.Count -gt 0) { $s.Last = @($s.WindowsQueue.Dequeue()) }; $s.Last }.GetNewClosure()
         WaitIdle       = { [void]$s.Calls.Add('WaitIdle') }.GetNewClosure()
-        Click          = { param($hwnd, $relX, $relY, $double, $title) [void]$s.Calls.Add(('Click:{0}:{1},{2}:{3}:{4}' -f $hwnd, $relX, $relY, $double, $title)) }.GetNewClosure()
-        SelectAll      = { param($hwnd, $title) [void]$s.Calls.Add(('SelectAll:{0}:{1}' -f $hwnd, $title)); if ($s.SelectAllThrows) { throw 'select broke' } }.GetNewClosure()
+        # 결과가 1건일 때 첫 결과를 여는 Enter 하나(2026-11-15 확인: 클릭 없이 Enter 로 열린다). 마우스 클릭 자리는 없다.
+        PressEnter     = { param($hwnd, $title) [void]$s.Calls.Add(('Enter:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
         Explain        = { param($hwnd) [void]$s.Calls.Add('Explain'); $s.Hint }.GetNewClosure()
         PasteText      = { param($hwnd, $text, $title) [void]$s.Calls.Add(('Paste:{0}:{1}:{2}' -f $hwnd, $text, $title)) }.GetNewClosure()
+        OpenSearch     = { param($hwnd, $title) [void]$s.Calls.Add(('OpenSearch:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
+        TabIsOpenChat  = { param($hwnd) [void]$s.Calls.Add('TabCheck'); $s.TabOpenChat }.GetNewClosure()
         OcrAvailable   = { [void]$s.Calls.Add('OcrAvailable'); $s.OcrAvailable }.GetNewClosure()
         ResultIsSingle = { param($hwnd, $name, $clickY) [void]$s.Calls.Add(('ResultCheck:{0}:{1}:{2}' -f $hwnd, $name, $clickY)); if ($s.ResultThrows) { throw 'ocr broke' }; $s.ResultSingle }.GetNewClosure()
         CloseWindow    = { param($hwnd, $title) [void]$s.Calls.Add(('Close:{0}:{1}' -f $hwnd, $title)) }.GetNewClosure()
@@ -33,7 +35,7 @@ function New-Win([long]$Hwnd, [string]$Title) { [pscustomobject]@{ Hwnd = $Hwnd;
 function Set-TestRooms([object[]]$Rooms) { Save-KitConfig -Config ([pscustomobject]@{ version = 1; consentAcceptedAt = $null; lastRoom = $null; rooms = $Rooms }) }
 function New-TestRoom([string]$Name, [bool]$AiRead = $false) { [pscustomobject]@{ name = $Name; type = 'open'; verified = $true; canRead = $true; canSend = $true; selfOnly = $true; aiRead = $AiRead; aiSend = $false } }
 # 키·마우스·창 닫기처럼 "실제로 입력되는" 호출만 센다.
-function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Click:*' -or $_ -like 'SelectAll:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
+function Get-InputCalls($s) { return @($s.Calls | Where-Object { $_ -like 'Enter:*' -or $_ -like 'OpenSearch:*' -or $_ -like 'Paste:*' -or $_ -like 'Close:*' }) }
 
 $MainWin = New-Win 10 '카카오톡'
 
@@ -176,6 +178,34 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
         }
     }
 
+    It 'does not click anything when the open-chat tab is not showing (the icon spot is add-friend on the friends tab)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeRoomProvider
+            $f.TabOpenChat = $false
+            $f.WindowsQueue.Enqueue(@($MainWin))
+            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
+            $e.ExitCode | Should Be 2
+            $e.Message | Should Match '오픈채팅'
+            ($f.Calls -contains 'TabCheck') | Should Be $true
+            (Get-InputCalls $f).Count | Should Be 0
+            ($f.Calls -contains 'WaitIdle') | Should Be $false
+        }
+    }
+
+    It 'checks the tab before the first click when the tab is right, then opens as before' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-OpenScenario
+            $r = Open-KakaoRoom -Name '테스트방' -Provider $f.Provider
+            $r.OpenedByKit | Should Be $true
+            $tab = [array]::IndexOf(@($f.Calls), 'TabCheck')
+            $click = [array]::IndexOf(@($f.Calls), @($f.Calls | Where-Object { $_ -like 'OpenSearch:*' })[0])
+            ($tab -ge 0) | Should Be $true
+            ($tab -lt $click) | Should Be $true
+        }
+    }
+
     It 'opens without the check only when a human allows it, and records a warning' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
@@ -190,7 +220,7 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
         }
     }
 
-    It 'never double-clicks when the result is not exactly one row (only the search icon was clicked)' {
+    It 'never presses Enter when the result is not exactly one row (the search was opened with Ctrl+F only)' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
             $f = New-FakeRoomProvider
@@ -198,14 +228,13 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
             $f.WindowsQueue.Enqueue(@($MainWin))
             $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
             $e.ExitCode | Should Be 2
-            $clicks = @($f.Calls | Where-Object { $_ -like 'Click:*' })
-            $clicks.Count | Should Be 1
-            $clicks[0] | Should Match ':False:'
+            @($f.Calls | Where-Object { $_ -like 'Enter:*' }).Count | Should Be 0
+            @($f.Calls | Where-Object { $_ -like 'OpenSearch:*' }).Count | Should Be 1
             @($f.Calls | Where-Object { $_ -like 'Close:*' }).Count | Should Be 0
         }
     }
 
-    It 'never double-clicks when the result check itself fails with an error' {
+    It 'never presses Enter when the result check itself fails with an error' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
             $f = New-FakeRoomProvider
@@ -213,38 +242,20 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
             $f.WindowsQueue.Enqueue(@($MainWin))
             $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
             $e.Message | Should Be 'ocr broke'
-            @($f.Calls | Where-Object { $_ -like 'Click:*' }).Count | Should Be 1
+            @($f.Calls | Where-Object { $_ -like 'Enter:*' }).Count | Should Be 0
         }
     }
 
-    It 'selects the whole search box between the icon click and the paste, so leftover text is replaced instead of appended' {
+    It 'pastes right after opening the search (Ctrl+F) and sends no select-all: Ctrl+A is the add-friend shortcut in the KakaoTalk main window' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
             $f = New-OpenScenario
             $null = Open-KakaoRoom -Name '테스트방' -Provider $f.Provider
-            $select = @($f.Calls | Where-Object { $_ -like 'SelectAll:*' })
-            $select.Count | Should Be 1
-            $select[0] | Should Be 'SelectAll:10:카카오톡'
-            $iIcon = $f.Calls.IndexOf('Click:10:0.714,0.116:False:카카오톡')
-            $iSelect = $f.Calls.IndexOf($select[0])
+            @($f.Calls | Where-Object { $_ -like 'SelectAll*' }).Count | Should Be 0
+            $iOpen = $f.Calls.IndexOf('OpenSearch:10:카카오톡')
             $iPaste = $f.Calls.IndexOf('Paste:10:테스트방:카카오톡')
-            $iIcon | Should BeLessThan $iSelect
-            $iSelect | Should BeLessThan $iPaste
-        }
-    }
-
-    It 'never pastes or double-clicks when the select-all step fails (only the search icon was clicked)' {
-        Use-TempHome {
-            Set-TestRooms @((New-TestRoom '테스트방'))
-            $f = New-FakeRoomProvider
-            $f.SelectAllThrows = $true
-            $f.WindowsQueue.Enqueue(@($MainWin))
-            $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
-            $e.Message | Should Be 'select broke'
-            @($f.Calls | Where-Object { $_ -like 'Paste:*' }).Count | Should Be 0
-            $clicks = @($f.Calls | Where-Object { $_ -like 'Click:*' })
-            $clicks.Count | Should Be 1
-            $clicks[0] | Should Match ':False:'
+            $iOpen | Should BeLessThan $iPaste
+            $iOpen | Should BeGreaterThan -1
         }
     }
 
@@ -288,7 +299,7 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
         }
     }
 
-    It 'opens a room in the documented order: search icon, paste the stored name, check, then double-click the first row' {
+    It 'opens a room in the documented order: Ctrl+F, paste the stored name, check that exactly one result shows, then one Enter (no mouse click at all)' {
         Use-TempHome {
             Set-TestRooms @((New-TestRoom '테스트방'))
             $f = New-OpenScenario
@@ -296,17 +307,17 @@ Describe 'Room: 열기 전 결과 확인 (fail-closed)' {
             $r.OpenedByKit | Should Be $true
             $r.Hwnd | Should Be 20
             $r.Title | Should Be '테스트방'
-            $clicks = @($f.Calls | Where-Object { $_ -like 'Click:*' })
-            $clicks.Count | Should Be 2
-            $clicks[0] | Should Be 'Click:10:0.714,0.116:False:카카오톡'
-            $clicks[1] | Should Be 'Click:10:0.45,0.335:True:카카오톡'
+            $clicks = @($f.Calls | Where-Object { $_ -like 'Enter:*' })
+            $clicks.Count | Should Be 1
+            $clicks[0] | Should Be 'Enter:10:카카오톡'
+            @($f.Calls | Where-Object { $_ -eq 'OpenSearch:10:카카오톡' }).Count | Should Be 1
             $paste = @($f.Calls | Where-Object { $_ -like 'Paste:*' })
             $paste.Count | Should Be 1
             $paste[0] | Should Be 'Paste:10:테스트방:카카오톡'
             $iPaste = $f.Calls.IndexOf($paste[0])
             # 결과 확인은 더블클릭할 높이(0.335)를 함께 받는다: 확인한 줄과 클릭하는 줄이 같은 위치임을 확인에서 따진다.
             $iCheck = $f.Calls.IndexOf('ResultCheck:10:테스트방:0.335')
-            $iDouble = $f.Calls.IndexOf($clicks[1])
+            $iDouble = $f.Calls.IndexOf($clicks[0])
             $iPaste | Should BeLessThan $iCheck
             $iCheck | Should BeLessThan $iDouble
             @($f.Calls | Where-Object { $_ -like 'Close:*' }).Count | Should Be 0
@@ -351,7 +362,7 @@ Describe 'Room: 연 뒤 확인' {
             $e = Get-ThrownError { Open-KakaoRoom -Name '테스트방' -Provider $f.Provider }
             $e.ExitCode | Should Be 3
             @($f.Calls | Where-Object { $_ -like 'Close:*' }).Count | Should Be 0
-            @($f.Calls | Where-Object { $_ -like 'Click:*' }).Count | Should Be 2
+            @($f.Calls | Where-Object { $_ -like 'Enter:*' }).Count | Should Be 1
         }
     }
 
@@ -385,16 +396,65 @@ Describe 'Room: Close-KitOpenedWindow' {
     }
 }
 
+Describe 'Room: 기본 제공자는 라이브러리를 스크립트 범위로 불러온 환경에서도 동작한다' {
+    It 'PasteText finds Send-KeyCombo when the libraries are dot-sourced inside a script file (a closure cannot see script-scope functions)' {
+        # 실제 사고: 스크립트 파일 안에서 라이브러리를 불러오면 함수가 스크립트 범위에 생긴다. .GetNewClosure() 로 만든 블록은 전역만 보여서
+        # Send-KeyCombo 를 못 찾는다(S5 에서 Ctrl+F·Ctrl+A 뒤 붙여넣기에서 멈춤). 시험은 키 전송과 클립보드를 가짜로 바꿔 입력 없이 확인한다.
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('room-scope-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        $body = @"
+`$ErrorActionPreference = 'Stop'
+foreach (`$n in 'Messages.ko', 'Paths', 'Errors', 'Config', 'Log', 'Win32', 'Guard', 'Clip', 'Ocr', 'Room') { . (Join-Path '$kitLibDir' "`$n.ps1") }
+`$script:seen = @()
+function Send-KeyCombo { param(`$Hwnd, `$Keys, `$ExpectedTitle) `$script:seen += `$Keys }
+function Use-TextClipboard { param(`$Text, [scriptblock]`$Action) & `$Action }
+`$p = Get-DefaultRoomProvider
+& `$p.PasteText 1 'abc' 'title'
+'SEEN=' + (`$script:seen -join ',')
+"@
+        try {
+            [System.IO.File]::WriteAllText($tmp, $body, (New-Object System.Text.UTF8Encoding($true)))
+            # -File 은 스크립트가 전역 범위에서 돌아 함수가 전역이 된다(사고를 못 잡는다). 실제 실행처럼 호출 연산자(&)로 부른다.
+            $out = (& powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command "& '$tmp'" 2>&1 | Out-String)
+            $out | Should Match 'SEEN=Ctrl\+V'
+        }
+        finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 Describe 'Room: 소스 규칙' {
-    It 'Room.ps1 sends only Ctrl+A (select the search box text) and Ctrl+V as keys, closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
+    It 'Room.ps1 sends only Ctrl+F (open the search) and Ctrl+V as keys (never Ctrl+A, the add-friend shortcut), closes windows only through Close-KakaoWindow, and does not call Win32 directly' {
         $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Room.ps1') -Raw -Encoding UTF8
         $keys = @([regex]::Matches($src, "-Keys '([^']*)'") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-        $keys.Count | Should Be 2
-        $keys[0] | Should Be 'Ctrl+A'
+        $keys.Count | Should Be 3
+        $keys[0] | Should Be 'Ctrl+F'
         $keys[1] | Should Be 'Ctrl+V'
-        # Enter·Delete·Esc 같은 키는 방 열기에서 절대 보내지 않는다(Ctrl+A 는 선택만 하므로 지우거나 보내지 않는다).
-        $src | Should Not Match "-Keys '(Enter|Delete|Backspace|Esc)"
+        $keys[2] | Should Be 'Enter'
+        # Enter 는 검색 결과가 정확히 1건임을 확인한 뒤 딱 한 곳에서만 보낸다. Delete·Backspace·Esc·Ctrl+A 는 방 열기에서 절대 보내지 않는다.
+        @([regex]::Matches($src, "-Keys 'Enter'")).Count | Should Be 1
+        $src | Should Not Match "-Keys '(Delete|Backspace|Esc|Ctrl\+A)"
         $src | Should Not Match '\[KakaoWin32\]::'
         $src | Should Not Match 'PostClose|SendInput|mouse_event'
+    }
+
+    It 'opens the search with Ctrl+F and has no click on a search-icon spot (the same spot is a different button on other tabs)' {
+        $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Room.ps1') -Raw -Encoding UTF8
+        $src | Should Match "-Keys 'Ctrl\+F'"
+        $src | Should Not Match 'SearchIcon'
+        $src | Should Not Match '0\.714'
+    }
+
+    It 'has no mouse click anywhere in room opening (the first result is opened with Enter, so no click position is needed)' {
+        $src = Get-Content -LiteralPath (Join-Path $kitLibDir 'Room.ps1') -Raw -Encoding UTF8
+        $code = (($src -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        $code | Should Not Match 'Invoke-RelClick|ClickAt|DoubleClick|mouse_event|SendInput|\bClick\s*='
+        $code | Should Not Match '& \$Provider\.Click'
+        $code | Should Not Match 'FirstResultRow\[0\]'
+    }
+
+    It 'the real provider presses Enter with the guarded key sender and has no click member' {
+        $p = Get-DefaultRoomProvider
+        $p.ContainsKey('PressEnter') | Should Be $true
+        $p.ContainsKey('Click') | Should Be $false
+        ($p.PressEnter.ToString()).Contains("'Enter'") | Should Be $true
     }
 }
