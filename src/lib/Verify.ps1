@@ -39,3 +39,17 @@ function Find-SentMessageInExport {
     }
     catch { return $unknown }
 }
+
+# 내보내기 제공자(-Export)에게 방과 보낸 분을 주고 메시지 목록을 받아 판정한다. 진짜 불리언 하나만 돌려준다.
+# 일치가 정확히 1개일 때만 $true 다. 0개는 못 찾은 것이고, 2개 이상은 같은 분에 같은 글이 이미 있었거나 두 번 나갔을 수 있어
+# "확인됨"으로 말하지 않는다(어느 쪽이든 자동 재시도는 없다). 제공자가 없거나 던지거나 아무것도 못 주면 $false(= 불명)이다.
+function Confirm-SentMessage {
+    param($Room, $Text, $Since, $SelfOnly, $Export)
+    try {
+        if ($Export -isnot [scriptblock]) { return $false }
+        $messages = @(& $Export $Room $Since)
+        $r = Find-SentMessageInExport -Messages $messages -Text $Text -Since $Since -SelfOnly $SelfOnly
+        return ($r.State -ceq 'confirmed' -and $r.Matches -eq 1)
+    }
+    catch { return $false }
+}

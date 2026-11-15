@@ -29,6 +29,8 @@ $script:SendFocusPollMs = 100
 #  - SendReadyApproved: 방 열기 → 보내기 → 확인 → 닫기 전체를 사람 승인 아래 실제 카카오톡에서 끝까지 시험하고, 사람이 열기로 정한 뒤에만 참.
 $script:SendVerifySentImplemented = $false
 $script:SendReadyApproved = $false
+# 보낸 글 확인에 쓸 내보내기 제공자(param($room, $since) 로 메시지 목록을 돌려주는 블록). 아직 없다($null) = 항상 불명. 시험이 가짜를 끼운다.
+$script:SendExporter = $null
 
 # 아직 채워지지 않은 Ready 조건의 이름 목록('VerifySent', 'Approval'). 비어 있어야 Ready 가 참이다. 참/거짓은 진짜 불리언일 때만 인정한다("true" 글자나 1 은 아니다).
 function Get-SendUnmetReadyConditions {
@@ -105,8 +107,13 @@ function Get-DefaultSendProvider {
                 try { Send-KeyCombo -Hwnd $hwnd -Keys 'Enter' -ExpectedTitle $title }
                 finally { Start-Sleep -Milliseconds $settleMs }
             } }
-        # 보낸 글이 방에 나타났는지 읽어서 확인하는 일은 읽기(M9 내보내기)가 연결된 뒤에 한다. 그전에는 확인하지 못한다(결과 = 불명).
-        VerifySent = { param($room, $text, $attemptId) $null }
+        # 보낸 글이 방에 나타났는지 확인하는 판정(Confirm-SentMessage). 메시지 목록은 $script:SendExporter 가 준다.
+        # 내보내기 제공자는 아직 없다(Ctrl+S 저장 창 실측 D1·D2 뒤에 만든다): 그전에는 항상 못 읽으므로 결과는 불명이다. 판정은 보낸 분 이후의 정확히 1개 일치일 때만 확인됨이다.
+        # 블록을 닫지 않는다(클로저 금지, 위와 같은 이유).
+        VerifySent = { param($room, $text, $attemptId, $sentAt)
+            $cfgRoom = Find-Room -Config (Get-KitConfig) -Name $room
+            $self = ($null -ne $cfgRoom -and $cfgRoom.selfOnly -is [bool] -and $cfgRoom.selfOnly -eq $true)
+            Confirm-SentMessage -Room $room -Text $text -Since $sentAt -SelfOnly $self -Export $script:SendExporter }
         CloseRoom  = { param($opened) [void](Close-KitOpenedWindow -Opened $opened) }
     }
 }
@@ -268,6 +275,8 @@ function Send-KakaoMessage {
             [void](& $Provider.FocusInput ([long]$opened.Hwnd) $title)
 
             # 키가 하나라도 나갔으면 중간에 멈춰도 오류가 아니라 '불명'이고 다시 시도하지 않는다. 하나도 안 나갔으면 "실패"(예외)다.
+            # 보낸 분(내보낸 시각은 지역 시각의 분 단위). 키가 나가기 바로 전에 잡는다.
+            $sentAt = ([datetime](& $Provider.Now)).ToLocalTime()
             $progress = @{ KeysSent = $false }
             try { [void](& $Provider.PasteEnter ([long]$opened.Hwnd) $Text $title $progress) }
             catch {
@@ -277,7 +286,7 @@ function Send-KakaoMessage {
 
             # 확인은 "진짜 true 하나"일 때만 확인됨이다. 아무것도 못 돌려주거나 예외가 나거나 true 가 아닌 값(1, 글자 "true", 둘 이상)이면 불명이다.
             $verified = @()
-            try { $verified = @(& $Provider.VerifySent $title $Text $id) } catch { $verified = @() }
+            try { $verified = @(& $Provider.VerifySent $title $Text $id $sentAt) } catch { $verified = @() }
             if ($verified.Count -eq 1 -and $verified[0] -is [bool] -and $verified[0] -eq $true) {
                 return (New-SendResult -Status 'confirmed' -Reason 'verified' -AttemptId $id -Room $title)
             }
