@@ -5,7 +5,10 @@
 #       호출하는 쪽이 -ErrorAction SilentlyContinue 를 쓰거나 그런 설정을 물려줘도 throw 가 무시되어 입력이 나가는 일이 없게 하기 위해서다.
 #       (tests/Bootstrap.Tests.ps1 이 소스를 구문 분석해 이 규칙을 강제한다)
 
-# 허용하는 키는 이 다섯 개뿐이다. Esc는 카카오톡에서 채팅 창을 닫으므로 표에 없고, 표에 없는 키는 거부된다. (C# 쪽에도 같은 표가 한 번 더 있다)
+# 허용하는 키는 이 여섯 개뿐이다. 표에 없는 키는 거부된다. (C# 쪽에도 같은 표가 한 번 더 있다)
+# Esc 는 카카오톡에서 채팅(방) 창을 닫으므로 오래 금지였다. 2026-11-15 에 사용자가 "메인 창에서 검색을 닫는 용도"로만 허용했다:
+# 대상 창 제목이 정확히 "카카오톡"(메인 창)일 때만 보낸다. 다른 제목이면 창을 건드리기 전에 거절한다(PowerShell 쪽 Send-KeyCombo 와 C# 쪽 SendCombo 양쪽).
+# 메인 창에서 검색이 열려 있는지는 부르는 쪽(Room.ps1)이 구조로 읽어 확인한 뒤에만 보낸다.
 # Ctrl+A 도 표에 없다: 카카오톡 메인 창에서 Ctrl+A 는 "전체 선택"이 아니라 "친구 추가" 창을 여는 단축키다(2026-11-12 화면의 툴팁으로 확인, D-25).
 # Ctrl+F(검색 열기)는 2026-11-12 에 사용자가 승인해 추가했다: 좌표 클릭은 탭마다 같은 자리가 다른 버튼이라 사고가 났다(D-25).
 $script:AllowedKeyCodes = @{
@@ -14,7 +17,10 @@ $script:AllowedKeyCodes = @{
     'Ctrl+C' = @(0x11, 0x43)
     'Ctrl+F' = @(0x11, 0x46)
     'Enter'  = @(0x0D)
+    'Esc'    = @(0x1B)
 }
+# Esc 를 보낼 수 있는 대상 창 제목(메인 창). 이 값과 정확히 같지 않으면 Esc 는 거절된다.
+$script:EscOnlyForTitle = '카카오톡'
 
 # C# 입력 함수가 돌려주는 결과 코드를 한글 메시지 키로 옮긴다.
 $script:GuardStatusKeys = @{
@@ -117,6 +123,10 @@ function Send-KeyCombo {
     )
     $ErrorActionPreference = 'Stop'
     $codes = Get-AllowedKeyCodes -Keys $Keys
+    # Esc 는 메인 창 제목일 때만. 다르면 창을 올리기도 전에(아무것도 건드리지 않고) 거절한다.
+    if ([string]::Equals($Keys, 'Esc', [System.StringComparison]::Ordinal) -and -not [string]::Equals($ExpectedTitle, $script:EscOnlyForTitle, [System.StringComparison]::Ordinal)) {
+        throw (New-GuardError -Key 'guard.keyNotAllowed' -FormatArgs @($Keys))
+    }
     if (-not $Provider) { $Provider = Get-DefaultInputProvider }
     Assert-NoUserInterference -Provider $Provider
     # 터미널이 포커스를 자주 되가져가므로 입력 직전마다 다시 앞으로 가져오고, 가져왔는지 확인한다.
