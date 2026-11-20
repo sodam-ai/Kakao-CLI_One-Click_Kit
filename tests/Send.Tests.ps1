@@ -973,7 +973,8 @@ Describe 'Send: Confirm-InputFocus (③-a, 클릭 없이 창을 올리고 입력
 Describe 'Send: Ready 조건 함수 (③-b, 기본은 계속 꺼 둔다)' {
     It 'lists what is still missing, and real sending stays locked while anything is missing' {
         $unmet = @(Get-SendUnmetReadyConditions)
-        ($unmet -contains 'VerifySent') | Should Be $true
+        # Z3(2026-11-20): 보낸 글 확인 장치가 연결돼 VerifySent 조건은 채워졌다. 사람 승인(Approval)만 남아 보내기는 계속 잠겨 있다.
+        ($unmet -contains 'VerifySent') | Should Be $false
         ($unmet -contains 'Approval') | Should Be $true
         $p = Get-DefaultSendProvider
         [bool](& $p.Ready) | Should Be $false
@@ -1006,9 +1007,9 @@ Describe 'Send: Ready 조건 함수 (③-b, 기본은 계속 꺼 둔다)' {
         finally { $script:SendVerifySentImplemented = $oldV; $script:SendReadyApproved = $oldA }
     }
 
-    It 'both switches ship as false in the source' {
+    It 'the verification switch ships as true (wired in Z3) but the approval switch ships as false in the source' {
         $text = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\lib\Send.ps1'))
-        $text | Should Match '\$script:SendVerifySentImplemented\s*=\s*\$false'
+        $text | Should Match '\$script:SendVerifySentImplemented\s*=\s*\$true'
         $text | Should Match '\$script:SendReadyApproved\s*=\s*\$false'
     }
 }

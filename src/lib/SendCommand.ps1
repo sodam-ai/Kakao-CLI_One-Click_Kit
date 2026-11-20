@@ -86,6 +86,8 @@ function Invoke-SendCommand {
         # 작업 전체를 감싸는 실행 잠금: 한 번에 하나만. 못 잡으면 입력 0 으로 멈춘다.
         Enter-KitLock
         $locked = $true
+        # 실제 실행이면 보낸 글 확인용 내보내기 제공자를 연결한다(실행 잠금은 위에서 잡았다. 내보내기 부품은 잠금을 잡지 않는다). 시험 제공자가 있으면 그쪽이 확인을 정한다.
+        if ($null -eq $Provider) { $script:SendExporter = Get-DefaultSendExporter }
         $params = @{ Room = $o.Room; Text = $text; Caller = $caller; DryRun = [bool]$o.DryRun; Yes = [bool]$o.Yes }
         if ($null -ne $o.AttemptId) { $params.AttemptId = $o.AttemptId }
         if ($null -ne $Provider) { $params.Provider = $Provider }
