@@ -264,6 +264,7 @@ Describe 'SendCommand: kakao.cmd 로 실제 실행 (새 프로세스)' {
 
     It 'kakao send with no options prints the usage and exits 1' {
         Use-TempHome {
+            Set-TestConsent   # 동의 게이트(Consent.Tests 가 따로 봄)를 지나가게 한다
             $r = Invoke-RealCli 'send'
             $r.ExitCode | Should Be 1
             $r.Out | Should Match '사용법'
@@ -272,6 +273,7 @@ Describe 'SendCommand: kakao.cmd 로 실제 실행 (새 프로세스)' {
 
     It 'kakao send with valid options stops at the locked sender: exit 3, nothing sent, no state file' {
         Use-TempHome {
+            Set-TestConsent
             $r = Invoke-RealCli 'send --room 없는방 --text hello --dry-run'
             $r.ExitCode | Should Be 3
             $r.Out | Should Match '아직 열리지 않았습니다'

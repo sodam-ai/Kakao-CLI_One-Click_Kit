@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 
-foreach ($name in 'Messages.ko.ps1', 'Paths.ps1') {
+foreach ($name in 'Messages.ko.ps1', 'Paths.ps1', 'Consent.ps1') {
     . (Join-Path $PSScriptRoot ('lib\' + $name))
 }
 
@@ -12,6 +12,14 @@ function Invoke-KakaoCommand {
     if ($Argv.Count -eq 0) {
         Write-Host (Get-Msg -Key 'error.noCommand')
         return 1
+    }
+    # 사용 동의 게이트: 카카오톡을 건드리거나 대화를 읽는 명령은 동의가 없으면 여기서 멈춘다(동의 확인 자체는 읽기만 한다).
+    if (Test-ConsentRequiredFor -Argv $Argv) {
+        foreach ($name in 'Errors', 'Config', 'Log') {
+            . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+        }
+        $gate = Invoke-ConsentGate
+        if ($null -ne $gate) { return [int]$gate }
     }
     switch ($Argv[0]) {
         'version' {
@@ -24,10 +32,17 @@ function Invoke-KakaoCommand {
                 Write-Host (Get-Msg -Key 'help.extraArgs')
                 return 1
             }
-            foreach ($key in 'help.title', 'help.version', 'help.status', 'help.rooms', 'help.open', 'help.read', 'help.search', 'help.send', 'help.help', 'help.soon') {
+            foreach ($key in 'help.title', 'help.version', 'help.status', 'help.rooms', 'help.open', 'help.read', 'help.search', 'help.send', 'help.consent', 'help.help', 'help.soon') {
                 Write-Host (Get-Msg -Key $key)
             }
             return 0
+        }
+        'consent' {
+            # 사용 동의 확인·받기. 카카오톡을 조작하지 않고, 설정 파일의 동의 날짜만 읽거나(사람이 키보드로 직접 동의할 때) 쓴다.
+            foreach ($name in 'Errors', 'Config', 'Log') {
+                . (Join-Path $PSScriptRoot ('lib\' + $name + '.ps1'))
+            }
+            return (Invoke-ConsentCommand -Argv @($Argv | Select-Object -Skip 1))
         }
         'open' {
             # 방 열기에 필요한 부품은 이 명령일 때만 불러온다. 허용 목록에 있는 방을 열어 창 제목을 확인하고 닫는다(글을 쓰거나 보내지 않는다).

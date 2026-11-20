@@ -373,6 +373,7 @@ Describe 'InfoCommands: kakao.cmd 로 실제 실행 (새 프로세스)' {
 
     It 'rooms list, status, and the usage errors of read, search and rooms run for real' {
         Use-TempHome {
+            Set-TestConsent   # 동의 게이트(Consent.Tests 가 따로 봄)를 지나가게 한다
             $r = Invoke-RealInfoCli 'rooms list'
             $r.ExitCode | Should Be 0
             $r.Out | Should Match '허용된 방이 없습니다'

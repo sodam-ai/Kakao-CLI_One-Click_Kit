@@ -18,6 +18,13 @@ function Use-TempHome([scriptblock]$Body) {
     }
 }
 
+# 임시 데이터 폴더(KAKAO_KIT_HOME)에 "사용 동의함" 상태의 설정 파일을 만든다(새 프로세스로 명령을 돌리는 시험이 동의 게이트를 지나가게 할 때 쓴다).
+function Set-TestConsent {
+    $p = Get-KitPaths
+    if (-not (Test-Path -LiteralPath $p.DataDir)) { New-Item -ItemType Directory -Path $p.DataDir -Force | Out-Null }
+    [System.IO.File]::WriteAllText($p.ConfigFile, '{"version":1,"consentAcceptedAt":"2026-11-20T09:00:00","lastRoom":null,"rooms":[]}', (New-Object System.Text.UTF8Encoding($false)))
+}
+
 # 본문이 던진 예외 객체를 돌려준다(던지지 않으면 $null).
 function Get-ThrownError([scriptblock]$Body) {
     try { & $Body } catch { return $_.Exception }
