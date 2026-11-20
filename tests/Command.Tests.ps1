@@ -1,5 +1,5 @@
 ﻿$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$libs = @('Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'Send', 'SendCommand')
+$libs = @('Win32', 'Guard', 'Config', 'Log', 'Clip', 'Status', 'Room', 'Parse', 'Exporter', 'Send', 'SendCommand')
 . (Join-Path $here '_Load.ps1')
 
 # 가짜 제공자: 방 열기·입력·확인을 시험이 정하고 호출을 기록한다. 실제 카카오톡은 건드리지 않는다.
@@ -303,5 +303,78 @@ Describe 'SendCommand: 실제 제공자는 잠겨 있다 (입력 0)' {
             }
             Test-Path -LiteralPath ([System.IO.Path]::Combine((Get-KitPaths).DataDir, 'state', 'send-state.json')) | Should Be $false
         }
+    }
+}
+
+Describe 'SendCommand: 보낸 글 확인용 내보내기 연결 (Z3, 보내기는 계속 잠김)' {
+    It 'a real run (no test provider) wires the real exporter into the verification hook, and still stops at the sending lock: exit 3, nothing sent' {
+        Use-TempHome {
+            Set-CmdRooms @((New-CmdRoom '테스트방'))
+            $script:SendExporter = $null
+            try {
+                $r = Invoke-Send @('--room', '테스트방', '--text', 'hi', '--dry-run') $null
+                $r.Exit | Should Be 3
+                $r.Out | Should Match '아직 열리지 않았습니다'
+                ($script:SendExporter -is [scriptblock]) | Should Be $true
+            }
+            finally { $script:SendExporter = $null }
+        }
+    }
+
+    It 'a test provider keeps the hook untouched (the fake decides what verification does)' {
+        Use-TempHome {
+            Set-CmdRooms @((New-CmdRoom '테스트방'))
+            $sentinel = { 'sentinel' }
+            $script:SendExporter = $sentinel
+            try {
+                $f = New-FakeCmdProvider
+                $r = Invoke-Send @('--room', '테스트방', '--text', 'hi', '--dry-run') $f.Provider
+                $r.Exit | Should Be 0
+                [object]::ReferenceEquals($script:SendExporter, $sentinel) | Should Be $true
+            }
+            finally { $script:SendExporter = $null }
+        }
+    }
+
+    It 'the router loads the parser and the exporter for the send command' {
+        $router = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\kakao.ps1'), (New-Object System.Text.UTF8Encoding($false)))
+        $branch = [regex]::Match($router, "(?s)'send'\s*\{.*?foreach \(\`$name in ([^)]*)\)")
+        $branch.Success | Should Be $true
+        $names = @([regex]::Matches($branch.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+        ($names -contains 'Parse') | Should Be $true
+        ($names -contains 'Exporter') | Should Be $true
+    }
+
+    It 'every kit function that the files loaded for the send command call is defined once the router has loaded them' {
+        $router = [System.IO.File]::ReadAllText((Join-Path $kitRoot 'src\kakao.ps1'), (New-Object System.Text.UTF8Encoding($false)))
+        $branch = [regex]::Match($router, "(?s)'send'\s*\{.*?foreach \(\`$name in ([^)]*)\)")
+        $branch.Success | Should Be $true
+        $names = @([regex]::Matches($branch.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+        $script = @'
+$ErrorActionPreference = 'Stop'
+$lib = '__LIB__'
+$names = '__NAMES__' -split ','
+foreach ($n in @('Messages.ko', 'Paths') + $names) { . (Join-Path $lib ($n + '.ps1')) }
+$all = @{}
+foreach ($f in (Get-ChildItem -LiteralPath $lib -Filter '*.ps1')) {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+    foreach ($fd in $ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) { $all[$fd.Name] = $true }
+}
+$missing = @()
+foreach ($n in $names) {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $lib ($n + '.ps1')), [ref]$null, [ref]$null)
+    foreach ($c in $ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        $cn = $c.GetCommandName()
+        if ($cn -and $all.ContainsKey($cn) -and -not (Get-Command -Name $cn -CommandType Function -ErrorAction SilentlyContinue)) { $missing += ($n + ' -> ' + $cn) }
+    }
+}
+'MISSING=' + (($missing | Sort-Object -Unique) -join '; ')
+'@
+        $script = $script.Replace('__LIB__', $kitLibDir).Replace('__NAMES__', ($names -join ','))
+        $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($script))
+        $out = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded 2>&1 | ForEach-Object { [string]$_ })
+        $line = @($out | Where-Object { $_ -like 'MISSING=*' })
+        $line.Count | Should Be 1
+        $line[0] | Should Be 'MISSING='
     }
 }

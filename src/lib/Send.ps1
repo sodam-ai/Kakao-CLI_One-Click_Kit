@@ -26,8 +26,9 @@ $script:SendFocusWaitMs = 2000
 $script:SendFocusPollMs = 100
 # Ready(실제 보내기 열기)의 두 조건. 둘 다 거짓으로 출고한다. 참으로 바꾸는 것은 사람 승인 뒤의 별도 작업이다.
 #  - SendVerifySentImplemented: 보낸 글을 방에서 확인하는 일(VerifySent)이 만들어지고 실제로 시험된 뒤에만 참. 없으면 모든 전송이 "불명"이 되어 같은 글을 다시 보내게 된다.
+#    (2026-11-20 참으로 바꿈: 내보내기 제공자를 명령 계층(SendCommand)에서 연결했고, 실제 카카오톡 D3 에서 "확인됨, 정확히 1건 일치"를 1회 확인했다.)
 #  - SendReadyApproved: 방 열기 → 보내기 → 확인 → 닫기 전체를 사람 승인 아래 실제 카카오톡에서 끝까지 시험하고, 사람이 열기로 정한 뒤에만 참.
-$script:SendVerifySentImplemented = $false
+$script:SendVerifySentImplemented = $true
 $script:SendReadyApproved = $false
 # 보낸 글 확인에 쓸 내보내기 제공자(param($room, $since) 로 메시지 목록을 돌려주는 블록). 아직 없다($null) = 항상 불명. 시험이 가짜를 끼운다.
 $script:SendExporter = $null
@@ -78,7 +79,7 @@ function Get-DefaultFocusProvider {
 function Get-DefaultSendProvider {
     $ErrorActionPreference = 'Stop'
     return @{
-        # 두 조건(VerifySent 구현, 사람 승인)이 모두 채워질 때만 참이다. 지금은 둘 다 거짓이라 실제 보내기는 잠겨 있다(Get-SendUnmetReadyConditions).
+        # 두 조건(VerifySent 구현, 사람 승인)이 모두 채워질 때만 참이다. 지금은 사람 승인이 거짓이라 실제 보내기는 잠겨 있다(Get-SendUnmetReadyConditions).
         Ready      = { @(Get-SendUnmetReadyConditions).Count -eq 0 }
         Mode       = { Get-KitMode }
         Now        = { [datetime]::UtcNow }
