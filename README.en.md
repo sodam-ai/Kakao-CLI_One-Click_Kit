@@ -709,7 +709,7 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 - Run once with the person's approval ("M8 approval (one test room, one line, once)" and "D3 60 seconds start"). One test line was sent to the test room and read back with the kit's exporter, and it was confirmed with exactly one match. Reading the input box and checking its focus, a real send, and the confirmed judgement were checked for the first time in real KakaoTalk. The temporary file was deleted, no save window was left, the clipboard was restored and the window list was the same as at the start. A new window with no title was left open with only a warning (as designed).
 - Based on this, the command layer (`kakao send`) now wires the exporter for a real run and the check switch (`SendVerifySentImplemented`) is on. A test provider leaves it untouched.
 - **Sending is still locked.** The approval switch (`SendReadyApproved`) is off, so `kakao send` stops with exit code 3. The lock message no longer says the check is missing.
-- Limits: one run, 100% scaling, the chat tab, the test room, one English line only. Emoji or multi-line text, a Korean body, 150% scaling, an ordinary room and duplicate messages in the same minute were not checked. A person did not look in the room to see the message appear once; the judgement is based on the export.
+- Limits: one run, 100% scaling, the chat tab, the test room, one English line only. Emoji or multi-line text, a Korean body, 150% scaling, an ordinary room and duplicate messages in the same minute were not checked. A person did not look in the room to see the message appear once; the judgement is based on the export (on 2026-11-21 a person did see that line appear once in the room; see D3b below).
 
 </details>
 <details>
@@ -719,6 +719,16 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 - So D2b and D3 on 11-20 were most likely run on 5364, but the version was not recorded then and cannot be confirmed. To keep this from happening again, `kakao send` now records the KakaoTalk version before any input (`start id=… kakao=…`). The body is never recorded, a version that cannot be read is written as `unknown`, and a failed record does not block sending (what blocks is the existing untested-version lock).
 - **Sending is still locked.** This change only adds a record; the lock and the approval are unchanged.
 - Limits: the tests used fake parts. Whether the record appears in a real KakaoTalk run can only be seen for the first time when sending is opened.
+
+</details>
+<details>
+<summary><strong>Round D3b: one real send and its check on KakaoTalk 5364, and the version record (2026-11-21)</strong> — no change in the number of tests (560)</summary>
+
+- Run once with the person's approval ("M8 approval" and "D3 60 seconds start"). On KakaoTalk `26.10.0.5364` (the registry and the executable agree), one English test line was sent to the test room and read back with the kit's exporter, and it was confirmed with exactly one match.
+- Before any key was pressed, one version record line (`start id=… kakao=26.10.0.5364`) and one result line were written, and the operating record had no message body. The temporary file was deleted, no save window was left, the clipboard was restored, and the window list and screen were the same as at the start. There was one warning whose content could not be checked (it may be the warning about a new window with no title, as in D3).
+- A person looked at the room and confirmed that this line and the earlier D3 line each appear once and that the input box is empty. Until now "confirmed" was based on the export; this is the first time a person's own check was added.
+- **Sending is still locked.** There was no code change, and the approval switch and the tested-version list (`config\verified-versions.json`) were not changed. Whether to add 5364 to the list is the owner's decision.
+- Limits: this PC, 100% scaling, the chat tab, the test room, one English line, one run each (D3 and D3b) only. Emoji, multi-line text, a Korean body (the full `kakao send` flow), 150% scaling, an ordinary room and duplicate messages in the same minute were not checked.
 
 </details>
 <details>
