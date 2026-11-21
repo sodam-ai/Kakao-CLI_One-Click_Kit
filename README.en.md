@@ -732,6 +732,17 @@ Click a title to expand it. Work was done from 2026-10-27 to 2026-10-31. The tes
 
 </details>
 <details>
+<summary><strong>Round D3c: one Korean line sent and checked on KakaoTalk 5364 (2026-11-21)</strong> — no change in the number of tests (560)</summary>
+
+- Run once with the person's approval ("M8 approval" and "D3c 60 seconds start"). On KakaoTalk `26.10.0.5364`, one test line containing Korean (8 Korean characters, 22 in all) was sent to the test room and read back with the kit's exporter, and it was confirmed with exactly one match. This means the Korean text matched character for character.
+- Before any key was pressed, one version record line and one result line were written, and the operating record had no message body. The temporary file was deleted, no save window was left, the clipboard was restored, and the window list and screen were the same as at the start. There was one warning whose content could not be checked (the same length as in D3 and D3b; it may be the warning about a new window with no title).
+- In the pre-check before starting, the test room window was already open (the person had left it open after checking by eye). The kit stops with zero input in that case, so the person closed the window and then started.
+- A person looked at the room and confirmed that the Korean line appears once with no garbled characters, that the earlier D3 and D3b lines each appear once, and that the input box is empty.
+- **Sending is still locked.** There was no code change, and the approval switch and the tested-version list were not changed.
+- Limits: this PC, 100% scaling, the chat tab, the test room, one line each time (two English runs and one Korean run). Emoji, multi-line text (the full `kakao send` flow), 150% scaling, an ordinary room and duplicate messages in the same minute were not checked.
+
+</details>
+<details>
 <summary><strong>Round D2b: the exporter part checked once for real (2026-11-20)</strong> — test count unchanged (552)</summary>
 
 - With the person's approval ("D2b 60 seconds start"), the kit's `Export-KakaoRoomMessages` was run once in the real KakaoTalk test room. The only input was the keys for opening the room and the `Ctrl+S`, `Ctrl+V` (temporary path) and `Enter` that the part sends; no message was sent. The settings and the temporary file stayed in a temporary data folder.
