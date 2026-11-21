@@ -82,6 +82,8 @@ function Get-DefaultSendProvider {
         # 두 조건(VerifySent 구현, 사람 승인)이 모두 채워질 때만 참이다. 지금은 사람 승인이 거짓이라 실제 보내기는 잠겨 있다(Get-SendUnmetReadyConditions).
         Ready      = { @(Get-SendUnmetReadyConditions).Count -eq 0 }
         Mode       = { Get-KitMode }
+        # 보내기를 시작할 때 기록에 남길 카카오톡 버전(읽기만). 읽지 못하거나 레지스트리·실행 파일 값이 다르면 'unknown'.
+        KakaoVersion = { $info = Get-KakaoInstallInfo; if ($null -ne $info -and -not [string]::IsNullOrWhiteSpace([string]$info.Version)) { [string]$info.Version } else { 'unknown' } }
         Now        = { [datetime]::UtcNow }
         # 명령 계층이 Enter-KitLock 으로 잡은 실행 잠금을 이 프로세스가 쥐고 있는가.
         LockHeld   = { $null -ne $script:KitLockMutex }
@@ -252,6 +254,14 @@ function Send-KakaoMessage {
         $id = if ($hasId) { $AttemptId } else { [guid]::NewGuid().ToString('N') }
         if ($state.Attempts -ccontains $id) { throw (New-KitError -Key 'send.attemptRepeated' -ExitCode 2) }
         Save-SendState -LastAttemptUtc $now -Ids (@($state.Attempts) + $id)
+
+        # 입력 전에 카카오톡 버전을 기록한다(본문 없음). 실물 결과가 어느 버전에서 나왔는지 나중에 알 수 있게 하려는 것이다.
+        # 버전을 못 읽어도, 기록이 실패해도 보내기는 막지 않는다(막는 것은 위의 모드 검사 몫).
+        $kakaoVersion = 'unknown'
+        if ($Provider.ContainsKey('KakaoVersion')) {
+            try { $readVersion = [string](& $Provider.KakaoVersion); if (-not [string]::IsNullOrWhiteSpace($readVersion)) { $kakaoVersion = $readVersion } } catch { }
+        }
+        Write-KitLog -Level 'info' -Command 'send' -Room $title -Result ('start id={0} kakao={1}' -f $id, $kakaoVersion)
 
         # --- 방 열기와 입력 ---
         $opened = & $Provider.OpenRoom $title $Caller

@@ -1013,3 +1013,61 @@ Describe 'Send: Ready 조건 함수 (③-b, 기본은 계속 꺼 둔다)' {
         $text | Should Match '\$script:SendReadyApproved\s*=\s*\$false'
     }
 }
+
+function Get-SendLogLines { $f = Join-Path (Get-KitPaths).LogsDir 'kakao.log'; if (Test-Path -LiteralPath $f) { return @([System.IO.File]::ReadAllLines($f)) } else { return @() } }
+
+Describe 'Send: 시작할 때 카카오톡 버전을 기록한다 (본문은 기록하지 않는다)' {
+    It 'logs one start line with the attempt id and the kakao version before any input, and never the message text' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeSendProvider
+            $f.Verify = $true
+            $f.Provider.KakaoVersion = { '26.10.0.5364' }
+            $r = Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text '비밀본문XYZ' -Yes -Provider $f.Provider
+            $r.Status | Should Be 'confirmed'
+            $lines = Get-SendLogLines
+            @($lines | Where-Object { $_ -match '\| info \| send \| 테스트방 \| start id=[0-9a-f]{32} kakao=26\.10\.0\.5364$' }).Count | Should Be 1
+            (($lines -join "`n") -match '비밀본문XYZ') | Should Be $false
+            # 시작 줄이 결과 줄(confirmed)보다 먼저 나온다.
+            $startAt = [array]::FindIndex([string[]]$lines, [Predicate[string]]{ param($l) $l -like '*| start id=*' })
+            $doneAt = [array]::FindIndex([string[]]$lines, [Predicate[string]]{ param($l) $l -like '*| confirmed id=*' })
+            ($startAt -ge 0 -and $doneAt -gt $startAt) | Should Be $true
+        }
+    }
+
+    It 'records unknown and still sends when the provider has no version reader, returns nothing, or throws' {
+        foreach ($variant in 'missing', 'empty', 'throws') {
+            Use-TempHome {
+                Set-TestRooms @((New-TestRoom '테스트방'))
+                $f = New-FakeSendProvider
+                $f.Verify = $true
+                if ($variant -eq 'empty') { $f.Provider.KakaoVersion = { $null } }
+                if ($variant -eq 'throws') { $f.Provider.KakaoVersion = { throw 'cannot read' } }
+                $r = Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider
+                $r.Status | Should Be 'confirmed'
+                @(Get-SendLogLines | Where-Object { $_ -match '\| start id=[0-9a-f]{32} kakao=unknown$' }).Count | Should Be 1
+            }
+        }
+    }
+
+    It 'writes no start line when it stops before any input (dry run, locked, wrong room)' {
+        Use-TempHome {
+            Set-TestRooms @((New-TestRoom '테스트방'))
+            $f = New-FakeSendProvider
+            $f.Provider.KakaoVersion = { '26.10.0.5364' }
+            [void](Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -DryRun -Provider $f.Provider)
+            $f.Ready = $false
+            [void](Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '테스트방' -Text 'hi' -Yes -Provider $f.Provider })
+            $f.Ready = $true
+            [void](Get-ThrownError { Send-KakaoMessage -Caller 'human' -Room '없는방' -Text 'hi' -Yes -Provider $f.Provider })
+            @(Get-SendLogLines | Where-Object { $_ -like '*| start id=*' }).Count | Should Be 0
+            (Get-SendInputCalls $f).Count | Should Be 0
+        }
+    }
+
+    It 'the default provider has a read-only version reader that always gives a non-empty text' {
+        $p = Get-DefaultSendProvider
+        $p.ContainsKey('KakaoVersion') | Should Be $true
+        [string](& $p.KakaoVersion) | Should Not BeNullOrEmpty
+    }
+}
