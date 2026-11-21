@@ -786,7 +786,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </li>
 <li><strong>Sending is still locked.</strong> The approval switch (<code>SendReadyApproved</code>) is off, so <code>kakao send</code> stops with exit code 3. The lock message no longer says the check is missing.
 </li>
-<li>Limits: one run, 100% scaling, the chat tab, the test room, one English line only. Emoji or multi-line text, a Korean body, 150% scaling, an ordinary room and duplicate messages in the same minute were not checked. A person did not look in the room to see the message appear once; the judgement is based on the export.
+<li>Limits: one run, 100% scaling, the chat tab, the test room, one English line only. Emoji or multi-line text, a Korean body, 150% scaling, an ordinary room and duplicate messages in the same minute were not checked. A person did not look in the room to see the message appear once; the judgement is based on the export (on 2026-11-21 a person did see that line appear once in the room; see D3b below).
 </li></ul>
 </details>
 <details>
@@ -799,6 +799,20 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <li><strong>Sending is still locked.</strong> This change only adds a record; the lock and the approval are unchanged.
 </li>
 <li>Limits: the tests used fake parts. Whether the record appears in a real KakaoTalk run can only be seen for the first time when sending is opened.
+</li></ul>
+</details>
+<details>
+<summary><strong>Round D3b: one real send and its check on KakaoTalk 5364, and the version record (2026-11-21)</strong> — no change in the number of tests (560)</summary>
+<ul>
+<li>Run once with the person's approval ("M8 approval" and "D3 60 seconds start"). On KakaoTalk <code>26.10.0.5364</code> (the registry and the executable agree), one English test line was sent to the test room and read back with the kit's exporter, and it was confirmed with exactly one match.
+</li>
+<li>Before any key was pressed, one version record line (<code>start id=… kakao=26.10.0.5364</code>) and one result line were written, and the operating record had no message body. The temporary file was deleted, no save window was left, the clipboard was restored, and the window list and screen were the same as at the start. There was one warning whose content could not be checked (it may be the warning about a new window with no title, as in D3).
+</li>
+<li>A person looked at the room and confirmed that this line and the earlier D3 line each appear once and that the input box is empty. Until now "confirmed" was based on the export; this is the first time a person's own check was added.
+</li>
+<li><strong>Sending is still locked.</strong> There was no code change, and the approval switch and the tested-version list (<code>config\verified-versions.json</code>) were not changed. Whether to add 5364 to the list is the owner's decision.
+</li>
+<li>Limits: this PC, 100% scaling, the chat tab, the test room, one English line, one run each (D3 and D3b) only. Emoji, multi-line text, a Korean body (the full <code>kakao send</code> flow), 150% scaling, an ordinary room and duplicate messages in the same minute were not checked.
 </li></ul>
 </details>
 <details>
